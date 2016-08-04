@@ -5,7 +5,10 @@ MDB_DIR=	${.CURDIR}/../../../../../usr/src/cmd/mdb
 PROG=	mdb
 
 CFLAGS+= -I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
-	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include
+	-I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
+	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
+	-I${OPENSOLARIS_USR_DISTDIR}/lib/libctf/common \
+	-I${OPENSOLARIS_SYS_DISTDIR}/uts/common
 
 .if ${MACHINE_ARCH} == "amd64"
 .PATH: ${MDB_DIR}/intel/amd64/mdb
@@ -99,3 +102,6 @@ SRCS+=	mdb_lex.l \
 	mdb_grammar.y
 
 .include <bsd.prog.mk>
+
+CWARNFLAGS+= -Wno-incompatible-pointer-types-discards-qualifiers \
+	-Wno-sign-compare -Wno-shadow

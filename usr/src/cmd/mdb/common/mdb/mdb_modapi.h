@@ -36,7 +36,7 @@
  * file may not be compatible with future versions of the debugger.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/null.h>
 #include <gelf.h>
 
