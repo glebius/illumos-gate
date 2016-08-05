@@ -70,7 +70,7 @@ extern const char *mdb_err2str(int);
 extern int mdb_dassert(const char *, const char *, int);
 #define	ASSERT(x)	((void)((x) || mdb_dassert(#x, __FILE__, __LINE__)))
 #else
-#define	ASSERT(x)
+#define	ASSERT(x)	((void)0)
 #endif
 
 #endif /* _MDB */
