@@ -101,7 +101,16 @@ LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem #-ldisasm -lscf
 SRCS+=	mdb_lex.l \
 	mdb_grammar.y
 
+# Convince mdb_types.h that FreeBSD always has uintptr_t defined.
+CFLAGS+= -D_SYS_INT_TYPES_H
+
+# Use 'aligned_alloc' from jemalloc for 'memalign'.
+CFLAGS+= -Dmemalign=aligned_alloc
+
 .include <bsd.prog.mk>
 
-CWARNFLAGS+= -Wno-incompatible-pointer-types-discards-qualifiers \
-	-Wno-sign-compare -Wno-shadow
+CWARNFLAGS+= -Wno-cast-align \
+	-Wno-incompatible-pointer-types-discards-qualifiers \
+	-Wno-shadow \
+	-Wno-sign-compare \
+	-Wno-unused-parameter
