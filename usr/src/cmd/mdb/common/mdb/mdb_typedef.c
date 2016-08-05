@@ -49,6 +49,7 @@
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_nv.h>
+#include <mdb/mdb_typedef.h>
 
 struct parse_node;
 
