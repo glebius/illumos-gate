@@ -54,7 +54,6 @@
 #include <sys/param.h>
 #include <stropts.h>
 
-#define	_MDB_PRIVATE
 #include <mdb/mdb.h>
 
 #include <mdb/mdb_context.h>
@@ -81,6 +80,8 @@
  * abort the current loop or pipeline.
  */
 #define	DCMD_ABORTED(x)	((x) == DCMD_USAGE || (x) == DCMD_ABORT)
+
+mdb_t mdb;
 
 extern const mdb_dcmd_t mdb_dcmd_builtins[];
 extern mdb_dis_ctor_f *const mdb_dis_builtins[];

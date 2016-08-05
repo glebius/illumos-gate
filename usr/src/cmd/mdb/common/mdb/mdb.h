@@ -200,11 +200,7 @@ typedef struct mdb {
 #endif
 } mdb_t;
 
-#ifdef _MDB_PRIVATE
-mdb_t mdb;
-#else
 extern mdb_t mdb;
-#endif
 
 #ifdef _MDB
 
