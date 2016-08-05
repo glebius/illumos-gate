@@ -113,6 +113,9 @@ CFLAGS+= -DTCGETS=TIOCGETA -DTCSETSW=TIOCSETAW
 # FreeBSD doesn't have an input mode like IUCLC
 CFLAGS+= -DIUCLC=0
 
+# Use ENOENT for ENODATA.
+CFLAGS+= -DENODATA=ENOENT
+
 .include <bsd.prog.mk>
 
 CWARNFLAGS+= -Wno-cast-align \
