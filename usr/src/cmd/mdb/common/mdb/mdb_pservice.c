@@ -92,6 +92,7 @@ static struct {
 	    psaddr_t, const void *, size_t);
 	ps_err_e (*ps_pglobal_lookup)(struct ps_prochandle *,
 	    const char *, const char *, psaddr_t *);
+#ifndef __FreeBSD__
 	ps_err_e (*ps_pglobal_sym)(struct ps_prochandle *P,
 	    const char *, const char *, ps_sym_t *);
 	ps_err_e (*ps_pauxv)(struct ps_prochandle *,
@@ -100,6 +101,7 @@ static struct {
 	    char *, size_t);
 	ps_err_e (*ps_pdmodel)(struct ps_prochandle *,
 	    int *);
+#endif
 } ps_ops;
 
 static mdb_tgt_t *
@@ -170,6 +172,7 @@ ps_pglobal_lookup(struct ps_prochandle *P, const char *object,
 	return (PS_NOSYM);
 }
 
+#ifndef __FreeBSD__
 /*
  * Search for a symbol by name and return the corresponding symbol data.
  * If we're compiled _LP64, we just call mdb_tgt_lookup_by_name and return
@@ -209,6 +212,7 @@ ps_pglobal_sym(struct ps_prochandle *P, const char *object,
 
 	return (PS_NOSYM);
 }
+#endif
 
 /*
  * Report a debug message.  We allow proc_service API clients to report
@@ -224,6 +228,7 @@ ps_plog(const char *format, ...)
 	va_end(alist);
 }
 
+#ifndef __FreeBSD__
 /*
  * Return the auxv structure from the process being examined.
  */
@@ -290,6 +295,7 @@ ps_pdmodel(struct ps_prochandle *P, int *dm)
 
 	return (PS_ERR);
 }
+#endif
 
 /*
  * Stub function in case we cannot find the necessary symbols from libproc.
@@ -316,6 +322,7 @@ mdb_pservice_init(void)
 	    dlsym(RTLD_NEXT, "ps_pwrite")) == NULL)
 		ps_ops.ps_pwrite = (ps_err_e (*)())ps_fail;
 
+#ifndef __FreeBSD__
 	if ((ps_ops.ps_pglobal_lookup = (ps_err_e (*)())
 	    dlsym(RTLD_NEXT, "ps_pglobal_lookup")) == NULL)
 		ps_ops.ps_pglobal_lookup = (ps_err_e (*)())ps_fail;
@@ -335,4 +342,5 @@ mdb_pservice_init(void)
 	if ((ps_ops.ps_pdmodel = (ps_err_e (*)())
 	    dlsym(RTLD_NEXT, "ps_pdmodel")) == NULL)
 		ps_ops.ps_pdmodel = (ps_err_e (*)())ps_fail;
+#endif
 }
