@@ -34,6 +34,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_debug.h>
+#include <mdb/mdb_set.h>
 #include <mdb/mdb.h>
 
 /*ARGSUSED*/
