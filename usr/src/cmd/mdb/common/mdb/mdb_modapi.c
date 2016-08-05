@@ -35,6 +35,7 @@
 #include <mdb/mdb_io.h>
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_frame.h>
+#include <mdb/mdb_target_impl.h>
 #include <mdb/mdb.h>
 
 /*
@@ -574,7 +575,7 @@ mdb_pwalk(const char *name, mdb_walk_cb_t func, void *private, uintptr_t addr)
 int
 mdb_walk(const char *name, mdb_walk_cb_t func, void *data)
 {
-	return (mdb_pwalk(name, func, data, NULL));
+	return (mdb_pwalk(name, func, data, 0));
 }
 
 /*ARGSUSED*/
@@ -634,7 +635,7 @@ int
 mdb_walk_dcmd(const char *wname, const char *dcname,
     int argc, const mdb_arg_t *argv)
 {
-	return (mdb_pwalk_dcmd(wname, dcname, argc, argv, NULL));
+	return (mdb_pwalk_dcmd(wname, dcname, argc, argv, 0));
 }
 
 /*ARGSUSED*/
