@@ -88,7 +88,7 @@ tab_find_command_start(char *buf)
  *
  * 	Note: This will modify the buffer.
  */
-char *
+static char *
 tab_get_dcmd(char *buf, char **args, uint_t *flags)
 {
 	char *start = buf + strlen(COMMAND_SEPARATOR);
