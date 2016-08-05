@@ -33,4 +33,4 @@
 
 typedef Elf_Auxinfo auxv_t;
 
-#endif
+#endif /* !_OPENSOLARIS_AUXV_H_ */
