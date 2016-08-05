@@ -41,6 +41,7 @@
 #include <mdb/mdb_ctf_impl.h>
 #include <mdb/mdb.h>
 #include <mdb/mdb_tab.h>
+#include <mdb/mdb_print.h>
 
 #include <sys/isa_defs.h>
 #include <sys/param.h>
@@ -156,7 +157,7 @@ addr_to_sym(mdb_tgt_t *t, uintptr_t addr, char *name, size_t namelen,
  * and increment the caller's argv and argc. This allows the caller to still
  * treat the type argument logically as it would an other atomic argument.
  */
-int
+static int
 args_to_typename(int *argcp, const mdb_arg_t **argvp, char *buf, size_t len)
 {
 	int argc = *argcp;
@@ -783,7 +784,7 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		a = tmp;
-	} while (a != addr && a != NULL);
+	} while (a != addr && a != 0);
 
 	return (DCMD_OK);
 }
@@ -952,7 +953,7 @@ print_int_val(const char *type, ctf_encoding_t *ep, ulong_t off,
 		uint16_t i2;
 		uint8_t i1;
 		time_t t;
-		ipaddr_t I;
+		in_addr_t I;
 	} u;
 
 	if (!(pap->pa_flags & PA_SHOWVAL))
@@ -1143,7 +1144,7 @@ print_ptr(const char *type, const char *name, mdb_ctf_id_t id,
 
 	mdb_printf("%a", value);
 
-	if (value == NULL || strcmp(type, "caddr_t") == 0)
+	if (value == 0 || strcmp(type, "caddr_t") == 0)
 		return (0);
 
 	if (mdb_ctf_type_kind(base) == CTF_K_POINTER &&
@@ -1757,7 +1758,6 @@ pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
 		return (0);
 	}
 
-again:
 	switch (mdb_ctf_type_kind(base)) {
 	case CTF_K_POINTER:
 		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as,
@@ -2365,7 +2365,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((flags & DCMD_ADDRSPEC) && !opt_i)
 		pa.pa_addr = opt_p ? mdb_get_dot() : addr;
 	else
-		pa.pa_addr = NULL;
+		pa.pa_addr = 0;
 
 	if (opt_i) {
 		const char *vargv[2];
