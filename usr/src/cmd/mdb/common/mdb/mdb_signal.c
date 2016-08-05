@@ -53,11 +53,12 @@ mdb_signal_sethandler(int sig, mdb_signal_f *handler, void *data)
 	sig_handlers[sig] = handler;
 	sig_data[sig] = data;
 
-	if (handler == SIG_DFL || handler == SIG_IGN) {
+	if ((void (*)(int))handler == SIG_DFL ||
+	    (void (*)(int))handler == SIG_IGN) {
 		act.sa_handler = handler;
 		act.sa_flags = SA_RESTART;
 	} else {
-		act.sa_handler = sig_stub;
+		act.sa_sigaction = sig_stub;
 		act.sa_flags = SA_SIGINFO | SA_RESTART | SA_ONSTACK;
 	}
 
