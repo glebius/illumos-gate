@@ -234,10 +234,10 @@ struct mdb_tgt {
 /*
  * Special functions which targets can use to fill ops vector slots:
  */
-extern long mdb_tgt_notsup();		/* Return -1, errno EMDB_TGTNOTSUP */
-extern long mdb_tgt_hwnotsup();		/* return -1, errno EMDB_TGTHWNOTSUP */
-extern void *mdb_tgt_null();		/* Return NULL, errno EMDB_TGTNOTSUP */
-extern long mdb_tgt_nop();		/* Return 0 for success */
+extern long mdb_tgt_notsup(void);	/* Return -1, errno EMDB_TGTNOTSUP */
+extern long mdb_tgt_hwnotsup(void);	/* return -1, errno EMDB_TGTHWNOTSUP */
+extern void *mdb_tgt_null(void);	/* Return NULL, errno EMDB_TGTNOTSUP */
+extern long mdb_tgt_nop(void);		/* Return 0 for success */
 
 /*
  * Utility structures for target implementations:
