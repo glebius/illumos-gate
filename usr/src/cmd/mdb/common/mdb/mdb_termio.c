@@ -69,6 +69,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
+#ifdef __FreeBSD__
+#include <sys/time.h>
+#include <termios.h>
+#endif
 
 #include <mdb/mdb_types.h>
 #include <mdb/mdb_cmdbuf.h>
@@ -89,6 +93,11 @@
 #endif
 
 #include <curses.h>
+#ifdef __FreeBSD__
+#include <term.h>
+
+#undef lines
+#endif
 
 #define	KEY_ESC	(0x01b)			/* Escape key code */
 #define	KEY_DEL (0x07f)			/* ASCII DEL key code */
@@ -309,9 +318,11 @@ static const char *termio_susp(termio_data_t *, int);
 static void termio_winch(int, siginfo_t *, ucontext_t *, void *);
 static void termio_tstp(int, siginfo_t *, ucontext_t *, void *);
 
+#ifndef __FreeBSD__
 extern const char *tigetstr(const char *);
 extern int tigetflag(const char *);
 extern int tigetnum(const char *);
+#endif
 
 static const mdb_io_ops_t termio_ops = {
 	termio_read,
@@ -365,7 +376,7 @@ static const termio_attr_t termio_attrs[] = {
 	{ "cnorm", TIO_ATTR_STR, &termio_info.ti_cnorm },
 	{ "nel", TIO_ATTR_STR, &termio_info.ti_nel },
 	{ "cr", TIO_ATTR_STR, &termio_info.ti_cr },
-	{ NULL, NULL, NULL }
+	{ NULL, 0, NULL }
 };
 
 /*
@@ -736,6 +747,7 @@ termio_suspend_tty(termio_data_t *td, struct termios *iosp)
 static void
 termio_resume_tty(termio_data_t *td, struct termios *iosp)
 {
+#ifndef __FreeBSD__
 	/*
 	 * We use this table of bauds to convert the baud constant returned by
 	 * the terminal code to a baud rate in characters per second.  The
@@ -751,10 +763,13 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 		1800, 2400, 4800, 9600, 19200, 38400, 57600,
 		76800, 115200, 153600, 230400, 307200, 460800, 921600
 	};
+#endif
 
 	struct termios *ntios;
 	struct winsize winsz;
+#ifndef __FreeBSD__
 	uint_t speed;
+#endif
 
 	if (td->tio_suspended == 0)
 		fail("termio_resume called without matching termio_suspend\n");
@@ -827,6 +842,10 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 	if (termio_ctl(td->tio_io, TCSETSW, ntios) < 0)
 		warn("failed to reset terminal attributes");
 
+#ifdef __FreeBSD__
+	/* FreeBSD's speed_t is the baud rather than an index. */
+	td->tio_baud = cfgetispeed(ntios);
+#else
 	/*
 	 * Compute the terminal speed as described in termio(7I), and then
 	 * look up the corresponding microseconds-per-char in our table.
@@ -843,6 +862,7 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 	}
 
 	td->tio_baud = baud[speed];
+#endif
 	td->tio_usecpc = MICROSEC / td->tio_baud;
 
 	mdb_dprintf(MDB_DBG_CMDBUF, "speed = %u baud (%u usec / char), "

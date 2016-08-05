@@ -107,9 +107,16 @@ CFLAGS+= -D_SYS_INT_TYPES_H
 # Use 'aligned_alloc' from jemalloc for 'memalign'.
 CFLAGS+= -Dmemalign=aligned_alloc
 
+# Map FreeBSD termios ioctls to illumos names.
+CFLAGS+= -DTCGETS=TIOCGETA -DTCSETSW=TIOCSETAW
+
+# FreeBSD doesn't have an input mode like IUCLC
+CFLAGS+= -DIUCLC=0
+
 .include <bsd.prog.mk>
 
 CWARNFLAGS+= -Wno-cast-align \
+	-Wno-incompatible-pointer-types \
 	-Wno-incompatible-pointer-types-discards-qualifiers \
 	-Wno-shadow \
 	-Wno-sign-compare \
