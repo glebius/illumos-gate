@@ -99,8 +99,8 @@ int
 mdb_module_create(const char *name, const char *fname, int mode,
     mdb_module_t **mpp)
 {
-	static const mdb_walker_t empty_walk_list[] = { 0 };
-	static const mdb_dcmd_t empty_dcmd_list[] = { 0 };
+	static const mdb_walker_t empty_walk_list[] = { { 0 } };
+	static const mdb_dcmd_t empty_dcmd_list[] = { { 0 } };
 
 	int dlmode = (mode & MDB_MOD_GLOBAL) ? RTLD_GLOBAL : RTLD_LOCAL;
 
@@ -124,7 +124,11 @@ mdb_module_create(const char *name, const char *fname, int mode,
 
 	if (!(mode & MDB_MOD_BUILTIN)) {
 		mdb_dprintf(MDB_DBG_MODULE, "dlopen %s %x\n", fname, dlmode);
+#ifdef __FreeBSD__
+		mod->mod_hdl = dlopen(fname, RTLD_NOW | dlmode);
+#else
 		mod->mod_hdl = dlmopen(LM_ID_BASE, fname, RTLD_NOW | dlmode);
+#endif
 
 		if (mod->mod_hdl == NULL) {
 			warn("%s\n", dlerror());
