@@ -4,8 +4,9 @@ MDB_DIR=	${.CURDIR}/../../../../../usr/src/cmd/mdb
 
 PROG=	mdb
 
-CFLAGS+= -I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
-	-I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
+CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
+	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
+	-I${.CURDIR}/../../../../cddl/compat/opensolaris/include \
 	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
 	-I${OPENSOLARIS_USR_DISTDIR}/lib/libctf/common \
 	-I${OPENSOLARIS_SYS_DISTDIR}/uts/common
@@ -100,6 +101,11 @@ LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem #-ldisasm -lscf
 
 SRCS+=	mdb_lex.l \
 	mdb_grammar.y
+
+.PATH: ${.CURDIR}/../../../../cddl/compat/opensolaris/misc
+
+SRCS+=	\
+	fdwalk.c
 
 # Convince mdb_types.h that FreeBSD always has uintptr_t defined.
 CFLAGS+= -D_SYS_INT_TYPES_H
