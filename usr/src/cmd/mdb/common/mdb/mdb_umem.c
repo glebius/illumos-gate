@@ -47,9 +47,9 @@
 #define	UMF_DEBUG			0x1
 
 #ifdef DEBUG
-int mdb_umem_flags = UMF_DEBUG;
+static int mdb_umem_flags = UMF_DEBUG;
 #else
-int mdb_umem_flags = 0;
+static int mdb_umem_flags = 0;
 #endif
 
 struct mdb_mblk {
