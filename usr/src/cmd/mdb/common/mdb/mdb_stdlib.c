@@ -35,6 +35,43 @@
 #include <floatingpoint.h>
 #include <poll.h>
 
+#ifdef __FreeBSD__
+#include <stdio.h>
+
+/*
+ * XXX: I'm not sure why 'snprintf' isn't sufficient here, but will
+ * try it for the initial port.  We can revisit this later if needed.
+ */
+const char *
+doubletos(double d, int precision, char expchr)
+{
+	static char buf[512];
+	char *cp;
+
+	snprintf(buf, sizeof(buf), "%+.*E", precision, d);
+	if (expchr != 'E') {
+		cp = strchr(buf, 'E');
+		if (cp != NULL)
+			*cp = expchr;
+	}
+	return (buf);
+}
+
+const char *
+longdoubletos(long double *ldp, int precision, char expchr)
+{
+	static char buf[512];
+	char *cp;
+
+	snprintf(buf, sizeof(buf), "%+.*LE", precision, *ldp);
+	if (expchr != 'E') {
+		cp = strchr(buf, 'E');
+		if (cp != NULL)
+			*cp = expchr;
+	}
+	return (buf);
+}	
+#else
 /*
  * Post-processing routine for econvert and qeconvert.  This function is
  * called by both doubletos() and longdoubletos() below.
@@ -109,3 +146,4 @@ longdoubletos(long double *ldp, int precision, char expchr)
 	p = qeconvert(ldp, precision + 1, &decpt, &sign, digits);
 	return (fptos(p, buf, sizeof (buf), decpt, sign, expchr));
 }
+#endif
