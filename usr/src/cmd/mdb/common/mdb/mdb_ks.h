@@ -28,16 +28,21 @@
 
 #include <sys/types.h>
 #include <sys/int_types.h>
+#ifndef __FreeBSD__
 #include <sys/stream.h>
+#endif
 #include <sys/vnode.h>
 #include <sys/proc.h>
+#ifndef __FreeBSD__
 #include <sys/dumphdr.h>
+#endif
 #include <sys/auxv.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+#ifndef __FreeBSD__
 /*
  * MDB Kernel Support Interfaces:
  *
@@ -170,6 +175,7 @@ extern pid_t mdb_kproc_pid(uintptr_t);
 
 extern void mdb_dump_print_content(dumphdr_t *, pid_t);
 extern int mdb_dump_find_curproc(void);
+#endif
 
 /*
  * KMDB Target Interface:
