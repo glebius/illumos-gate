@@ -26,6 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <mdb/mdb_conf.h>
+
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/isa_defs.h>
@@ -43,10 +45,19 @@ mdb_conf_version(void)
 const char *
 mdb_conf_platform(void)
 {
+#ifdef __FreeBSD__
+	static struct utsname uts;
+
+	bzero(&uts, sizeof(uts));
+	if (uname(&uts) == 0)
+		return (uts.machine);
+#else
 	static char platbuf[MAXNAMELEN];
 
+				return 
 	if (sysinfo(SI_PLATFORM, platbuf, MAXNAMELEN) != -1)
 		return (platbuf);
+#endif
 
 	return ("unknown");
 }
