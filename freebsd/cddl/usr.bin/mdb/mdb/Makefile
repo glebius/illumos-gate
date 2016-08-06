@@ -8,6 +8,7 @@ CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
 	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
 	-I${.CURDIR}/../../../../cddl/compat/opensolaris/include \
 	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
+	-I${OPENSOLARIS_USR_DISTDIR}/head \
 	-I${OPENSOLARIS_USR_DISTDIR}/lib/libctf/common \
 	-I${OPENSOLARIS_SYS_DISTDIR}/uts/common
 
@@ -72,7 +73,6 @@ SRCS += \
 	mdb_nv.c \
 	mdb_pipeio.c \
 	mdb_print.c \
-	mdb_proc.c \
 	mdb_pservice.c \
 	mdb_rawfile.c \
 	mdb_set.c \
@@ -92,6 +92,18 @@ SRCS += \
 	mdb_wcb.c \
 	mdb_whatis.c
 
+TODO+= \
+	mdb_proc.c \
+# Requires illumos libproc interface.  Only needed
+# for live process debugging and likely needs a lot
+# of work
+
+# Other notes:
+# - mdb_pservice.c might not be needed either.  Neither gdb nor lldb use
+#   libthread_db on FreeBSD.  It doesn't support XSAVE/AVX either.  Probably
+#   simpler to use ptrace() directly and just support "lwp" thread model
+#   via direct ptrace()
+
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 
 LIBADD=	curses kvm proc rtld_db ctf umem #disasm scf
@@ -105,7 +117,8 @@ SRCS+=	mdb_lex.l \
 .PATH: ${.CURDIR}/../../../../cddl/compat/opensolaris/misc
 
 SRCS+=	\
-	fdwalk.c
+	fdwalk.c \
+	proc_str2sig.c
 
 # Convince mdb_types.h that FreeBSD always has uintptr_t defined.
 CFLAGS+= -D_SYS_INT_TYPES_H
@@ -127,6 +140,7 @@ CFLAGS+= -DENODATA=ENOENT
 CWARNFLAGS+= -Wno-cast-align \
 	-Wno-incompatible-pointer-types \
 	-Wno-incompatible-pointer-types-discards-qualifiers \
+	-Wno-missing-field-initializers \
 	-Wno-shadow \
 	-Wno-sign-compare \
 	-Wno-unused-parameter
