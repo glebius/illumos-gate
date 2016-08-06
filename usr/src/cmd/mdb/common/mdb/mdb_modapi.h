@@ -127,6 +127,8 @@ typedef struct mdb_dcmd {
 	mdb_dcmd_tab_f *dc_tabp;	/* Tab completion function */
 } mdb_dcmd_t;
 
+extern const mdb_dcmd_t mdb_dcmd_builtins[];
+
 #define	WALK_ERR	-1		/* Walk fatal error (terminate walk) */
 #define	WALK_NEXT	0		/* Walk should continue to next step */
 #define	WALK_DONE	1		/* Walk is complete (no errors) */

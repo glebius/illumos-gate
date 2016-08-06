@@ -32,7 +32,9 @@
  */
 
 #include <sys/elf.h>
+#ifndef __FreeBSD__
 #include <sys/elf_SPARC.h>
+#endif
 
 #include <libproc.h>
 #include <stdlib.h>
@@ -443,10 +445,10 @@ print_arglist(mdb_tgt_as_t as, mdb_tgt_addr_t addr, uint_t flags,
 		 * scanform("z") and produces a 'bad modifier' message.
 		 */
 		static const mdb_arg_t def_argv[] = {
-			{ MDB_TYPE_CHAR, MDB_INIT_CHAR('X') },
-			{ MDB_TYPE_CHAR, MDB_INIT_CHAR('^') },
-			{ MDB_TYPE_STRING, MDB_INIT_STRING("= ") },
-			{ MDB_TYPE_CHAR, MDB_INIT_CHAR('i') }
+			{ MDB_TYPE_CHAR, { MDB_INIT_CHAR('X') } },
+			{ MDB_TYPE_CHAR, { MDB_INIT_CHAR('^') } },
+			{ MDB_TYPE_STRING, { MDB_INIT_STRING("= ") } },
+			{ MDB_TYPE_CHAR, { MDB_INIT_CHAR('i') } }
 		};
 
 		argc = sizeof (def_argv) / sizeof (mdb_arg_t);
@@ -1201,7 +1203,7 @@ static int
 cmd_old_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	if (argc == 0) {
-		mdb_arg_t arg = { MDB_TYPE_STRING, MDB_INIT_STRING("-d") };
+		mdb_arg_t arg = { MDB_TYPE_STRING, { MDB_INIT_STRING("-d") } };
 		return (cmd_log(addr, flags, 1, &arg));
 	}
 
@@ -2702,7 +2704,7 @@ cmd_run(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("failed to create new target");
 		return (DCMD_ERR);
 	}
-	return (cmd_cont(NULL, 0, 0, NULL));
+	return (cmd_cont(0, 0, 0, NULL));
 }
 #endif
 
@@ -2722,7 +2724,7 @@ ve_delete(mdb_tgt_t *t, mdb_tgt_spec_desc_t *sp, int vid, void *data)
 	if (vid < 0)
 		return (0); /* skip over target implementation events */
 
-	if (sp->spec_base != NULL) {
+	if (sp->spec_base != 0) {
 		(void) mdb_tgt_vespec_info(t, vid, &spec, NULL, 0);
 		if (sp->spec_base - spec.spec_base < spec.spec_size)
 			status = mdb_tgt_vespec_delete(t, vid);
@@ -2749,7 +2751,7 @@ ve_delete_spec(mdb_tgt_spec_desc_t *sp)
 	    (mdb_tgt_vespec_f *)ve_delete, sp);
 
 	if (sp->spec_size == 0) {
-		if (sp->spec_id != 0 || sp->spec_base != NULL)
+		if (sp->spec_id != 0 || sp->spec_base != 0)
 			mdb_warn("no traced events matched description\n");
 	}
 

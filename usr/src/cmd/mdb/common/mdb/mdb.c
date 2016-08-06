@@ -83,7 +83,6 @@
 
 mdb_t mdb;
 
-extern const mdb_dcmd_t mdb_dcmd_builtins[];
 extern mdb_dis_ctor_f *const mdb_dis_builtins[];
 
 /*
