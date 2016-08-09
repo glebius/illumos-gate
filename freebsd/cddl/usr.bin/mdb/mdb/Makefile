@@ -111,7 +111,7 @@ TODO+= \
 #   getcontext()
 # - no drop-in equivalent for libdemangle and demangle.h.  Would need to
 #   use demangling bits from libcxxrt instead (__cxa_demangle)
-# - no drop-in equivalent for 
+# - "fault" events will need more work to implement
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 

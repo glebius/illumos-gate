@@ -31,5 +31,6 @@
 
 int	proc_str2sig(const char *str, int *signum);
 int	proc_str2sys(const char *str, int *sysnum);
+int	proc_str2flt(const char *str, int *fltnum);
 
 #endif /* !_OPENSOLARIS_LIBPROC_H_ */

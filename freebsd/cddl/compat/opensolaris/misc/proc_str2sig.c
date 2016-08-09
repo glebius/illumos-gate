@@ -76,3 +76,10 @@ proc_str2sys(const char *str, int *sysnum)
 		}
 	return (-1);
 }
+
+/* XXX: I am not sure what fault names this expects. */
+int
+proc_str2flt(const char *str, int *fltnum)
+{
+	return (-1);
+}
