@@ -1,6 +1,8 @@
 # $FreeBSD$
 
 MDB_DIR=	${.CURDIR}/../../../../../usr/src/cmd/mdb
+LIBDISASM_DIR=	${.CURDIR}/../../../../../usr/src/lib/libdisasm
+DIS_DIR=	${.CURDIR}/../../../../../usr/src/common/dis
 
 PROG=	mdb
 
@@ -9,6 +11,8 @@ CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
 	-I${.CURDIR}/../../../../cddl/compat/opensolaris/include \
 	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
 	-I${OPENSOLARIS_USR_DISTDIR}/head \
+	-I${LIBDISASM_DIR}/common \
+	-I${DIS_DIR}/i386 \
 	-I${OPENSOLARIS_USR_DISTDIR}/lib/libctf/common \
 	-I${OPENSOLARIS_SYS_DISTDIR}/uts/common
 
@@ -107,6 +111,7 @@ TODO+= \
 #   getcontext()
 # - no drop-in equivalent for libdemangle and demangle.h.  Would need to
 #   use demangling bits from libcxxrt instead (__cxa_demangle)
+# - no drop-in equivalent for 
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 
@@ -123,6 +128,17 @@ SRCS+=	mdb_lex.l \
 SRCS+=	\
 	fdwalk.c \
 	proc_str2sig.c
+
+# Just include libdisasm objects in mdb for now.
+.PATH: ${LIBDISASM_DIR}/common
+.PATH: ${DIS_DIR}/i386
+
+SRCS+=	\
+	libdisasm.c \
+	dis_i386.c \
+	dis_tables.c
+
+CFLAGS+= -DDIS_TEXT
 
 # Convince mdb_types.h that FreeBSD always has uintptr_t defined.
 CFLAGS+= -D_SYS_INT_TYPES_H
@@ -144,7 +160,10 @@ CFLAGS+= -DENODATA=ENOENT
 CWARNFLAGS+= -Wno-cast-align \
 	-Wno-incompatible-pointer-types \
 	-Wno-incompatible-pointer-types-discards-qualifiers \
+	-Wno-logical-op-parentheses \
+	-Wno-missing-braces \
 	-Wno-missing-field-initializers \
+	-Wno-missing-variable-declarations \
 	-Wno-shadow \
 	-Wno-sign-compare \
 	-Wno-unused-parameter
