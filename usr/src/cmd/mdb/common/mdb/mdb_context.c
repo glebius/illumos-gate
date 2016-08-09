@@ -42,6 +42,9 @@
 #include <mdb/mdb_err.h>
 
 #include <sys/types.h>
+#ifdef __FreeBSD__
+#include <sys/link_elf.h>
+#endif
 #include <sys/mman.h>
 
 #include <ucontext.h>
@@ -63,7 +66,11 @@ mdb_context_create(int (*func)(void))
 {
 	mdb_context_t *c = mdb_zalloc(sizeof (mdb_context_t), UM_NOSLEEP);
 	size_t pagesize = sysconf(_SC_PAGESIZE);
+#ifdef __FreeBSD__
+	int prot = _rtld_get_stack_prot();
+#else
 	int prot = sysconf(_SC_STACK_PROT);
+#endif
 	static int zfd = -1;
 
 	if (c == NULL)
@@ -92,7 +99,9 @@ mdb_context_create(int (*func)(void))
 		}
 	}
 
+#ifndef __FreeBSD__
 	c->ctx_uc.uc_flags = UC_ALL;
+#endif
 	if (c->ctx_stack == MAP_FAILED || getcontext(&c->ctx_uc) != 0) {
 		mdb_free(c, sizeof (mdb_context_t));
 		return (NULL);
