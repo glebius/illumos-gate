@@ -270,6 +270,7 @@ ctf_to_errno(int err)
 }
 
 #ifndef _KMDB
+#ifndef __FreeBSD__
 /*
  * The libthread_db interface is a superfund site and provides no strerror
  * equivalent for us to call: we try to provide some sensible handling for its
@@ -311,6 +312,7 @@ tdb_to_errno(int err)
 		return (EMDB_TDB);
 	}
 }
+#endif
 
 int
 rdb_to_errno(int err)
