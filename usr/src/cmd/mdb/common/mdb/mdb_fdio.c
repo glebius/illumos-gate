@@ -274,7 +274,11 @@ mdb_fdio_create(int fd)
 	mdb_io_t *io = mdb_alloc(sizeof (mdb_io_t), UM_SLEEP);
 	fd_data_t *fdp = mdb_alloc(sizeof (fd_data_t), UM_SLEEP);
 
+#ifdef __FreeBSD__
+	off_t mediasize;
+#else
 	struct dk_cinfo info;
+#endif
 	struct stat64 st;
 
 	switch (fd) {
@@ -300,7 +304,11 @@ mdb_fdio_create(int fd)
 	 * block-oriented i/o; otherwise we can just use read() and write().
 	 */
 	if (fstat64(fd, &st) == 0 && S_ISCHR(st.st_mode) &&
+#ifdef __FreeBSD__
+	    ioctl(fd, DIOCGMEDIASIZE, &mediasize) == 0)
+#else
 	    ioctl(fd, DKIOCINFO, &info) == 0)
+#endif
 		io->io_ops = &fdio_bdev_ops;
 	else
 		io->io_ops = &fdio_file_ops;
