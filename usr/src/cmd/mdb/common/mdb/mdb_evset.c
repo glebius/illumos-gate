@@ -29,6 +29,7 @@
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_string.h>
+#include <mdb/mdb_evset.h>
 #include <mdb/mdb.h>
 
 #include <libproc.h>
