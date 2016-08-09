@@ -103,6 +103,10 @@ TODO+= \
 #   libthread_db on FreeBSD.  It doesn't support XSAVE/AVX either.  Probably
 #   simpler to use ptrace() directly and just support "lwp" thread model
 #   via direct ptrace()
+# - should really use getcontextx() to handle XSAVE/AVX state instead of
+#   getcontext()
+# - no drop-in equivalent for libdemangle and demangle.h.  Would need to
+#   use demangling bits from libcxxrt instead (__cxa_demangle)
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 

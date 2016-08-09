@@ -31,7 +31,9 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
 
+#ifndef __FreeBSD__
 #include <demangle.h>
+#endif
 #include <strings.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -46,6 +48,9 @@ static const char LIB_DEMANGLE[] = "/usr/lib/libdemangle.so.1";
 mdb_demangler_t *
 mdb_dem_load(const char *path)
 {
+#ifdef __FreeBSD__
+	return (NULL);
+#else
 	mdb_demangler_t *dmp;
 	void *hdl, *func;
 
@@ -73,6 +78,7 @@ mdb_dem_load(const char *path)
 	dmp->dm_flags = MDB_DM_SCOPE;
 
 	return (dmp);
+#endif
 }
 
 void
@@ -98,7 +104,7 @@ mdb_dem_filter(mdb_demangler_t *dmp, const char *name)
 	size_t resid;
 
 	/*
-	 * If static, const, and volatile qualifiers should not be displayed,
+/	 * If static, const, and volatile qualifiers should not be displayed,
 	 * rip all of them out of dmp->dm_dem.
 	 */
 	if (!(dmp->dm_flags & MDB_DM_QUAL)) {
@@ -191,6 +197,7 @@ mdb_dem_filter(mdb_demangler_t *dmp, const char *name)
 	return (dmp->dm_buf);
 }
 
+#ifndef __FreeBSD__
 /*
  * Take a name: (the foo`bar` is optional)
  *	foo`bar`__mangled_
@@ -232,10 +239,12 @@ mdb_dem_process(mdb_demangler_t *dmp, const char *name)
 
 	return (dmp->dm_convert(name, buf, len));
 }
+#endif
 
 const char *
 mdb_dem_convert(mdb_demangler_t *dmp, const char *name)
 {
+#ifndef __FreeBSD__
 	int err;
 
 	while ((err = mdb_dem_process(dmp, name)) == DEMANGLE_ESPACE) {
@@ -254,6 +263,7 @@ mdb_dem_convert(mdb_demangler_t *dmp, const char *name)
 
 	if (err != 0 || strcmp(dmp->dm_buf, name) == 0)
 		return (name); /* return original name if not mangled */
+#endif
 
 	return (mdb_dem_filter(dmp, name));
 }
