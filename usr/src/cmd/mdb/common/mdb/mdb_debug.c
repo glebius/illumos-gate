@@ -32,6 +32,7 @@
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb.h>
 
+#include <dlfcn.h>
 #include <libproc.h>
 #include <libctf.h>
 #include <rtld_db.h>
