@@ -61,6 +61,8 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_fmt.h>
+#include <mdb/mdb_help.h>
 #include <mdb/mdb.h>
 
 #define	FUNCP(p)	((void *)(p))	/* Cast to f_ptr type */

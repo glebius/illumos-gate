@@ -158,6 +158,7 @@ CFLAGS+= -DENODATA=ENOENT
 .include <bsd.prog.mk>
 
 CWARNFLAGS+= -Wno-cast-align \
+	-Wno-char-subscripts \
 	-Wno-incompatible-pointer-types \
 	-Wno-incompatible-pointer-types-discards-qualifiers \
 	-Wno-logical-op-parentheses \
