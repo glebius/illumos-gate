@@ -30,5 +30,6 @@
 #define	_OPENSOLARIS_LIBPROC_H_
 
 int	proc_str2sig(const char *str, int *signum);
+int	proc_str2sys(const char *str, int *sysnum);
 
 #endif /* !_OPENSOLARIS_LIBPROC_H_ */

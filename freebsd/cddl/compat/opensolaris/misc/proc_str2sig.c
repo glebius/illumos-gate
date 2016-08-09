@@ -27,6 +27,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
 #include <libproc.h>
 #include <signal.h>
 #include <string.h>
@@ -56,5 +57,22 @@ proc_str2sig(const char *str, int *signum)
 			return (0);
 		}
 	}
+	return (-1);
+}
+
+/* XXX: This isn't really quite right. */
+static
+#include </sys/kern/syscalls.c>
+
+int
+proc_str2sys(const char *str, int *sysnum)
+{
+	unsigned i;
+
+	for (i = 0; i < nitems(syscallnames); i++)
+		if (strcmp(syscallnames[i], str) == 0) {
+			*sysnum = i;
+			return (0);
+		}
 	return (-1);
 }
