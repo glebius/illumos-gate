@@ -129,10 +129,10 @@ TODO+= \
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 
-LIBADD=	curses kvm proc rtld_db ctf umem
+LIBADD=	curses kvm proc rtld_db ctf umem elf
 
 # For 10.x
-LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem
+LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -lelf
 
 SRCS+=	mdb_lex.l \
 	mdb_grammar.y
@@ -151,7 +151,13 @@ SRCS+=	\
 SRCS+=	\
 	libdisasm.c \
 	dis_i386.c \
-	dis_tables.c
+	dis_tables.c \
+	dis_sparc.c \
+	dis_sparc_fmt.c \
+	dis_sparc_instr.c \
+	dis_s390x.c
+
+CWARNFLAGS.dis_s390x.c=-Wno-format
 
 CFLAGS+= -DDIS_TEXT
 
