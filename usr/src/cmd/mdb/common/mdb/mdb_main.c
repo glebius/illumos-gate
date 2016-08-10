@@ -400,7 +400,6 @@ mdb_scf_console_term(void)
 	scf_simple_prop_free(prop);
 	return (term);
 }
-#endif
 
 /*
  * Unpleasant hack: we might be debugging a hypervisor domain dump.
@@ -433,12 +432,15 @@ identify_xvm_file(const char *file, int *longmode)
 	return (0);
 }
 #endif /* __x86 */
+#endif
 
 int
 main(int argc, char *argv[], char *envp[])
 {
+#ifndef __FreeBSD__
 	extern int mdb_kvm_is_compressed_dump(mdb_io_t *);
 	extern int mdb_kvm_is_dump(mdb_io_t *);
+#endif
 	mdb_tgt_ctor_f *tgt_ctor = NULL;
 	const char **tgt_argv = alloca((argc + 2) * sizeof (char *));
 	int tgt_argc = 0;
@@ -455,7 +457,9 @@ main(int argc, char *argv[], char *envp[])
 	int fflag = 0, Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
 
 	int ttylike;
+#ifndef __FreeBSD__
 	int longmode = 0;
+#endif
 
 	stack_t sigstack;
 
@@ -553,9 +557,11 @@ main(int argc, char *argv[], char *envp[])
 				fflag++;
 				tgt_ctor = mdb_rawfile_tgt_create;
 				break;
+#ifndef __FreeBSD__
 			case 'k':
 				tgt_ctor = mdb_kvm_tgt_create;
 				break;
+#endif
 			case 'm':
 				mdb.m_tgtflags |= MDB_TGT_F_NOLOAD;
 				mdb.m_tgtflags &= ~MDB_TGT_F_PRELOAD;
@@ -564,10 +570,12 @@ main(int argc, char *argv[], char *envp[])
 				if (!mdb_set_options(optarg, TRUE))
 					terminate(2);
 				break;
+#ifndef __FreeBSD__
 			case 'p':
 				tgt_ctor = mdb_proc_tgt_create;
 				pidarg = optarg;
 				break;
+#endif
 			case 's':
 				if (!strisnum(optarg)) {
 					warn("expected integer following -s\n");
@@ -575,9 +583,11 @@ main(int argc, char *argv[], char *envp[])
 				}
 				mdb.m_symdist = (size_t)(uint_t)strtoi(optarg);
 				break;
+#ifndef __FreeBSD__
 			case 'u':
 				tgt_ctor = mdb_proc_tgt_create;
 				break;
+#endif
 			case 'w':
 				mdb.m_tgtflags |= MDB_TGT_F_RDWR;
 				break;
@@ -805,6 +815,7 @@ main(int argc, char *argv[], char *envp[])
 	if (mdb_get_prompt() == NULL && !(mdb.m_flags & MDB_FL_ADB))
 		(void) mdb_set_prompt(MDB_DEF_PROMPT);
 
+#ifndef __FreeBSD__
 	if (tgt_ctor == mdb_kvm_tgt_create) {
 		if (pidarg != NULL) {
 			warn("-p and -k options are mutually exclusive\n");
@@ -820,6 +831,7 @@ main(int argc, char *argv[], char *envp[])
 				tgt_argv[tgt_argc++] = "/dev/kmem";
 		}
 	}
+#endif
 
 	if (pidarg != NULL) {
 #ifdef __FreeBSD__
@@ -927,6 +939,7 @@ main(int argc, char *argv[], char *envp[])
 			die("failed to open %s", tgt_argv[0]);
 
 		if (tgt_argc == 1) {
+#ifndef __FreeBSD__
 			if (mdb_kvm_is_compressed_dump(io)) {
 				/*
 				 * We have a single vmdump.N compressed dump
@@ -946,6 +959,7 @@ main(int argc, char *argv[], char *envp[])
 				 */
 				tgt_argv[tgt_argc++] = tgt_argv[0];
 			}
+#endif
 		}
 
 		/*
@@ -965,6 +979,7 @@ main(int argc, char *argv[], char *envp[])
 
 		mdb_io_destroy(io);
 
+#ifndef __FreeBSD__
 		if (identify_xvm_file(tgt_argv[0], &longmode) == 1) {
 #ifdef _LP64
 			if (!longmode)
@@ -1019,6 +1034,7 @@ main(int argc, char *argv[], char *envp[])
 
 			mdb_io_destroy(io);
 		}
+#endif
 
 		/*
 		 * At this point, we've read the ELF header for either an
@@ -1036,7 +1052,11 @@ main(int argc, char *argv[], char *envp[])
 
 tcreate:
 	if (tgt_ctor == NULL)
+#ifdef __FreeBSD__
+		die("no target ctor");
+#else
 		tgt_ctor = mdb_proc_tgt_create;
+#endif
 
 	tgt = mdb_tgt_create(tgt_ctor, mdb.m_tgtflags, tgt_argc, tgt_argv);
 
