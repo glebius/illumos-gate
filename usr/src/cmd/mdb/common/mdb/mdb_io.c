@@ -1665,7 +1665,7 @@ iob_spb_create(mdb_iob_t *iob, char *iob_buf, size_t iob_len,
 }
 
 /*ARGSUSED*/
-ssize_t
+static ssize_t
 null_io_write(mdb_io_t *io, const void *buf, size_t nbytes)
 {
 	return (nbytes);
