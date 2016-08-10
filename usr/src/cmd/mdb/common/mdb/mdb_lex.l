@@ -50,6 +50,23 @@
 
 #include "mdb_grammar.h"
 
+#ifdef FLEX_SCANNER
+#define	YY_INPUT(buf,result,max_size) {					\
+	int c = mdb_iob_getc(mdb.m_in);					\
+									\
+	if (c == '\n')							\
+		yylineno++;						\
+	if (c == EOF)							\
+		result = YY_NULL;					\
+	else {								\
+		buf[0] = c;						\
+		result = 1;						\
+	}								\
+}
+
+#define YY_NO_INPUT
+#define	YY_NO_UNPUT
+#else
 /*
  * lex hardcodes yyin and yyout to stdin and stdout, respectively, before we get
  * control.  We've redirected printf and fprintf (see mdb_lex.h) to yyprintf and
@@ -81,10 +98,13 @@ FILE __iob[_NFILE];
 static int input(void);
 static void unput(int);
 static void output(int);
+#endif
 
 static void string_unquote(char *);
 
+#ifndef FLEX_SCANNER
 extern int yydebug;
+#endif
 
 /*
  * This will prevent lex from trying to malloc() and resize our yytext variable,
@@ -518,7 +538,11 @@ RGX_COMMENT	"//".*\n
 void
 mdb_lex_debug(int i)
 {
+#ifdef FLEX_SCANNER
+	yyset_debug(i);
+#else
 	yydebug = i;
+#endif
 }
 
 void
@@ -626,6 +650,7 @@ yyprintf(const char *format, ...)
 	return (0);
 }
 
+#ifndef FLEX_SCANNER
 static int
 input(void)
 {
@@ -652,6 +677,7 @@ output(int c)
 	char ch = c;
 	mdb_iob_nputs(mdb.m_out, &ch, sizeof (ch));
 }
+#endif
 
 static char *
 string_nextquote(char *s, char q1, char q2)
@@ -715,6 +741,52 @@ string_unquote(char *s)
 	(void) memmove(s, o, strlen(o) + 1);
 }
 
+#ifdef FLEX_SCANNER
+typedef struct mdb_lex_state {
+	YY_BUFFER_STATE state;
+	int	yylineno;
+} mdb_lex_state_t;
+
+void 
+mdb_lex_state_save(mdb_lex_state_t *s)
+{
+
+	s->yylineno = yylineno;
+}
+
+void 
+mdb_lex_state_restore(mdb_lex_state_t *s)
+{
+	ASSERT(s != NULL);
+
+	yy_switch_to_buffer(s->state);
+	yylineno = s->yylineno;
+}
+
+void
+mdb_lex_state_create(mdb_frame_t *f)
+{
+	f->f_lstate = mdb_alloc(sizeof (mdb_lex_state_t), UM_SLEEP);
+
+	f->f_lstate->state = yy_create_buffer(NULL, YY_BUF_SIZE);
+	f->f_lstate->yylineno = 1;
+	mdb_argvec_create(&f->f_argvec);
+	f->f_oldstate = 0;
+	yy_switch_to_buffer(f->f_lstate->state);
+	yylineno = 1;
+	mdb_lex_reset();
+}
+
+void
+mdb_lex_state_destroy(mdb_frame_t *f)
+{
+	ASSERT(YY_CURRENT_BUFFER != (YY_BUFFER_STATE)f->f_lstate);
+
+	yy_delete_buffer((YY_BUFFER_STATE)f->f_lstate);
+	f->f_lstate = NULL;
+	mdb_argvec_destroy(&f->f_argvec);
+}
+#else
 /*
  * Unfortunately, lex and yacc produces code that is inherently global.  They do
  * not provide routines to save and restore state, instead relying on global
@@ -862,3 +934,4 @@ mdb_lex_state_destroy(mdb_frame_t *f)
 	f->f_lstate = NULL;
 	mdb_argvec_destroy(&f->f_argvec);
 }
+#endif
