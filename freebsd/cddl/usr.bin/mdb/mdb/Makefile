@@ -5,6 +5,7 @@ LIBDISASM_DIR=	${.CURDIR}/../../../../../usr/src/lib/libdisasm
 DIS_DIR=	${.CURDIR}/../../../../../usr/src/common/dis
 
 PROG=	mdb
+MAN=
 
 CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
 	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
@@ -125,10 +126,10 @@ TODO+= \
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 
-LIBADD=	curses kvm proc rtld_db ctf umem #disasm scf
+LIBADD=	curses kvm proc rtld_db ctf umem
 
 # For 10.x
-LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem #-ldisasm -lscf
+LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem
 
 SRCS+=	mdb_lex.l \
 	mdb_grammar.y
@@ -137,7 +138,8 @@ SRCS+=	mdb_lex.l \
 
 SRCS+=	\
 	fdwalk.c \
-	proc_str2sig.c
+	proc_str2sig.c \
+	sig2str.c
 
 # Just include libdisasm objects in mdb for now.
 .PATH: ${LIBDISASM_DIR}/common
