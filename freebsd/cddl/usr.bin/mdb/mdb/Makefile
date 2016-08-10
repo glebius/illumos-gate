@@ -85,7 +85,6 @@ SRCS += \
 	mdb_strio.c \
 	mdb_tab.c \
 	mdb_target.c \
-	mdb_tdb.c \
 	mdb_termio.c \
 	mdb_typedef.c \
 	mdb_umem.c \
@@ -112,6 +111,10 @@ TODO+= \
 	mdb_kvm.c \
 # Will also require a good bit of porting and possibly just rewriting
 # from scratch
+TODO+= \
+	mdb_tdb.c \
+# I think we don't actually need this since we won't be using libthread_db
+# on FreeBSD
 
 # Other notes:
 # - mdb_pservice.c might not be needed either.  Neither gdb nor lldb use
