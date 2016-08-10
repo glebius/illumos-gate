@@ -57,6 +57,7 @@ ffetch(void *buf, size_t nbytes, uintptr_t addr)
 		yyperror("failed to read from address %p", addr);
 }
 
+#ifndef __FreeBSD__
 /*
  * Because we define YYMAXDEPTH as zero below, we have to provide a YYEXPAND()
  * function to expand our yys and yyv variables.  For simplicity, we currently
@@ -76,6 +77,7 @@ yyexpand(int val)
  */
 #undef	YYMAXDEPTH
 #define	YYMAXDEPTH	0
+#endif
 %}
 
 %union {

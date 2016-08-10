@@ -50,7 +50,9 @@ extern void yydiscard(void);
 
 extern int yyparse(void);
 extern int yywrap(void);
-
+#ifdef __FreeBSD__
+extern int yylex(void);
+#endif
 
 struct mdb_lex_state;
 struct mdb_frame;
