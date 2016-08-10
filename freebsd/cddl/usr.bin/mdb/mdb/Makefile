@@ -62,9 +62,6 @@ SRCS += \
 	mdb_gelf.c \
 	mdb_help.c \
 	mdb_io.c \
-	mdb_kb_kvm.c \
-	mdb_kproc.c \
-	mdb_kvm.c \
 	mdb_logio.c \
 	mdb_list.c \
 	mdb_macalias.c \
@@ -101,6 +98,19 @@ TODO+= \
 # Requires illumos libproc interface.  Only needed
 # for live process debugging and likely needs a lot
 # of work
+TODO+= \
+	mdb_kb_kvm.c \
+# Will require some modest porting I think
+TODO+= \
+	mdb_kproc.c \
+# Will require quite a bit of porting and thinking.  FreeBSD's libkvm
+# doesn't support the 'aread' interface to interface with a given user
+# process' address space for example, so initially we may be stuck with
+# a more constrained implementation.
+TODO+= \
+	mdb_kvm.c \
+# Will also require a good bit of porting and possibly just rewriting
+# from scratch
 
 # Other notes:
 # - mdb_pservice.c might not be needed either.  Neither gdb nor lldb use
