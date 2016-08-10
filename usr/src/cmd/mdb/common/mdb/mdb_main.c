@@ -30,18 +30,28 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
+#ifdef __FreeBSD__
+#include <sys/rtprio.h>
+#else
 #include <sys/priocntl.h>
 #include <sys/rtpriocntl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/termios.h>
 #include <sys/param.h>
+#ifndef __FreeBSD__
 #include <sys/regset.h>
+#endif
 #include <sys/frame.h>
 #include <sys/stack.h>
+#ifndef __FreeBSD__
 #include <sys/reg.h>
+#endif
 
 #include <libproc.h>
+#ifndef __FreeBSD__
 #include <libscf.h>
+#endif
 #include <alloca.h>
 #include <unistd.h>
 #include <string.h>
@@ -51,6 +61,7 @@
 #include <libctf.h>
 #include <errno.h>
 #include <kvm.h>
+#include <rtld_db.h>
 
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_debug.h>
@@ -64,7 +75,9 @@
 #include <mdb/mdb_io_impl.h>
 #include <mdb/mdb_frame.h>
 #include <mdb/mdb_set.h>
+#ifndef __FreeBSD__
 #include <kmdb/kmdb_kctl.h>
+#endif
 #include <mdb/mdb.h>
 
 #ifndef STACK_BIAS
@@ -180,8 +193,13 @@ flt_handler(int sig, siginfo_t *sip, ucontext_t *ucp, void *data)
 		goto dump;
 
 	if (mdb.m_term != NULL) {
+#ifdef __FreeBSD__
+		struct frame *fr = (struct frame *)
+		    (mcontext_sp(ucp->uc_mcontext) + STACK_BIAS);
+#else
 		struct frame *fr = (struct frame *)
 		    (ucp->uc_mcontext.gregs[STACK_REGISTER] + STACK_BIAS);
+#endif
 
 		char signame[SIG2STR_MAX];
 		int i = 1;
@@ -197,8 +215,13 @@ flt_handler(int sig, siginfo_t *sip, ucontext_t *ucp, void *data)
 			    mdb.m_pname, signame);
 		}
 
+#ifdef __FreeBSD__
+		if (mcontext_pc(ucp->uc_mcontext) != 0)
+			print_frame(mcontext_pc(ucp->uc_mcontext), i++);
+#else
 		if (ucp->uc_mcontext.gregs[REG_PC] != 0)
 			print_frame(ucp->uc_mcontext.gregs[REG_PC], i++);
+#endif
 
 		while (fr != NULL && valid_frame(fr) && fr->fr_savpc != 0) {
 			print_frame(fr->fr_savpc, i++);
@@ -281,7 +304,9 @@ dump:
 	if (_mdb_abort_str == NULL)
 		_mdb_abort_str = "fatal signal received";
 
+#ifndef __FreeBSD__
 	ucp->uc_flags |= UC_SIGMASK;
+#endif
 	(void) setcontext(ucp);
 }
 
@@ -295,6 +320,7 @@ int_handler(int sig, siginfo_t *sip, ucontext_t *ucp, void *data)
 		mdb.m_pend++;
 }
 
+#ifndef __FreeBSD__
 static void
 control_kmdb(int start)
 {
@@ -317,6 +343,7 @@ control_kmdb(int start)
 
 	(void) close(fd);
 }
+#endif
 
 static void
 usage(int status)
@@ -354,6 +381,7 @@ usage(int status)
 	terminate(status);
 }
 
+#ifndef __FreeBSD__
 static char *
 mdb_scf_console_term(void)
 {
@@ -372,6 +400,7 @@ mdb_scf_console_term(void)
 	scf_simple_prop_free(prop);
 	return (term);
 }
+#endif
 
 /*
  * Unpleasant hack: we might be debugging a hypervisor domain dump.
@@ -633,10 +662,12 @@ main(int argc, char *argv[], char *envp[])
 		}
 	}
 
+#ifndef __FreeBSD__
 	if (rd_ctl(RD_CTL_SET_HELPPATH, (void *)mdb.m_root) != RD_OK) {
 		warn("cannot set librtld_db helper path to %s\n", mdb.m_root);
 		terminate(2);
 	}
+#endif
 
 	if (mdb.m_debug & MDB_DBG_HELP)
 		terminate(0); /* Quit here if we've printed out the tokens */
@@ -653,6 +684,10 @@ main(int argc, char *argv[], char *envp[])
 	}
 
 	if (Kflag || Uflag) {
+#ifdef __FreeBSD__
+		warn("Not supported on FreeBSD");
+		terminate(2);
+#else
 		char *nm;
 
 		if (tgt_ctor != NULL || Iflag != NULL) {
@@ -699,6 +734,7 @@ main(int argc, char *argv[], char *envp[])
 		control_kmdb(Kflag);
 		terminate(0);
 		/*NOTREACHED*/
+#endif
 	}
 
 	if (eflag != NULL) {
@@ -786,6 +822,16 @@ main(int argc, char *argv[], char *envp[])
 	}
 
 	if (pidarg != NULL) {
+#ifdef __FreeBSD__
+		/*
+		 * TODO: Would need to accept a single pid and use
+		 * kern.proc.pathname sysctl to locate executable.
+		 * Would probably use proc_attach?
+		 */
+		warn("-p not yet supported");
+		terminate(2);
+		(void) mdb_iob_snprintf(object, MAXPATHLEN, "dummy");
+#else
 		if (tgt_argc != 0) {
 			warn("-p may not be used with other arguments\n");
 			terminate(2);
@@ -802,6 +848,7 @@ main(int argc, char *argv[], char *envp[])
 			    "/proc/%s/object/a.out", pidarg);
 		tgt_argv[tgt_argc++] = object;
 		tgt_argv[tgt_argc++] = pidarg;
+#endif
 	}
 
 	/*
@@ -1017,6 +1064,16 @@ tcreate:
 	 * we now attempt to enter piggy-mode for debugging jurassic problems.
 	 */
 	if (Oflag) {
+#ifdef __FreeBSD__
+		struct rtprio rtp;
+
+		rtp.type = RTP_PRIO_REALTIME;
+		rtp.prio = 15;
+		if (rtprio_thread(RTP_SET, 0, &rtp) == -1) {
+			warn("failed to set RT priority");
+			Oflag = 0;
+		}
+#else
 		pcinfo_t pci;
 
 		(void) strcpy(pci.pc_clname, "RT");
@@ -1040,6 +1097,7 @@ tcreate:
 			warn("failed to get RT class id");
 			Oflag = 0;
 		}
+#endif
 
 		if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
 			warn("failed to lock address space");
