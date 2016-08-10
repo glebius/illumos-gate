@@ -37,7 +37,9 @@
  */
 
 #include <mdb/mdb_debug.h>
+#include <mdb/mdb_modapi.h>
 #include <mdb/mdb_nv.h>
+#include <mdb/mdb_macalias.h>
 #include <mdb/mdb.h>
 
 typedef struct mdb_macalias {
