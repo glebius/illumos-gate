@@ -40,10 +40,10 @@ mdb_create_builtin_tgts(void)
 {
 	mdb_module_t *mp;
 
-#ifndef __FreeBSD__
 	if ((mp = mdb_module_load_builtin("mdb_kvm")) != NULL)
 		mp->mod_tgt_ctor = mdb_kvm_tgt_create;
 
+#ifndef __FreeBSD__
 	if ((mp = mdb_module_load_builtin("mdb_proc")) != NULL)
 		mp->mod_tgt_ctor = mdb_proc_tgt_create;
 

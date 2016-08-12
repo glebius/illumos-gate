@@ -62,6 +62,9 @@
 #include <errno.h>
 #include <kvm.h>
 #include <rtld_db.h>
+#ifdef __FreeBSD__
+#include <paths.h>
+#endif
 
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_debug.h>
@@ -557,11 +560,9 @@ main(int argc, char *argv[], char *envp[])
 				fflag++;
 				tgt_ctor = mdb_rawfile_tgt_create;
 				break;
-#ifndef __FreeBSD__
 			case 'k':
 				tgt_ctor = mdb_kvm_tgt_create;
 				break;
-#endif
 			case 'm':
 				mdb.m_tgtflags |= MDB_TGT_F_NOLOAD;
 				mdb.m_tgtflags &= ~MDB_TGT_F_PRELOAD;
@@ -815,13 +816,18 @@ main(int argc, char *argv[], char *envp[])
 	if (mdb_get_prompt() == NULL && !(mdb.m_flags & MDB_FL_ADB))
 		(void) mdb_set_prompt(MDB_DEF_PROMPT);
 
-#ifndef __FreeBSD__
 	if (tgt_ctor == mdb_kvm_tgt_create) {
 		if (pidarg != NULL) {
 			warn("-p and -k options are mutually exclusive\n");
 			terminate(2);
 		}
 
+#ifdef __FreeBSD__
+		if (tgt_argc == 0) {
+			tgt_argv[tgt_argc++] = getbootfile();
+			tgt_argv[tgt_argc++] = _PATH_MEM;
+		}
+#else
 		if (tgt_argc == 0)
 			tgt_argv[tgt_argc++] = "/dev/ksyms";
 		if (tgt_argc == 1 && strisnum(tgt_argv[0]) == 0) {
@@ -830,8 +836,8 @@ main(int argc, char *argv[], char *envp[])
 			else
 				tgt_argv[tgt_argc++] = "/dev/kmem";
 		}
-	}
 #endif
+	}
 
 	if (pidarg != NULL) {
 #ifdef __FreeBSD__
