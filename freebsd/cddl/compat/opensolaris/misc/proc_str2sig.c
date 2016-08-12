@@ -62,7 +62,7 @@ proc_str2sig(const char *str, int *signum)
 
 /* XXX: This isn't really quite right. */
 static
-#include </sys/kern/syscalls.c>
+#include <sys/kern/syscalls.c>
 
 int
 proc_str2sys(const char *str, int *sysnum)

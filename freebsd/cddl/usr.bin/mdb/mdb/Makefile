@@ -144,6 +144,9 @@ SRCS+=	\
 	proc_str2sig.c \
 	sig2str.c
 
+# For the "sys/kern/syscalls.c" include.
+CFLAGS+= -I${FREEBSD_SRC_DIR}
+
 # Just include libdisasm objects in mdb for now.
 .PATH: ${LIBDISASM_DIR}/common
 .PATH: ${DIS_DIR}/i386
