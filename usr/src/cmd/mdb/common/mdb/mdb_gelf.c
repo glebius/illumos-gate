@@ -713,10 +713,18 @@ gelf64_init(mdb_gelf_file_t *gf, mdb_io_t *io, Elf64_Ehdr *ehdr)
 int
 mdb_gelf_check(mdb_io_t *io, Elf32_Ehdr *ehp, GElf_Half etype)
 {
+#ifdef __FreeBSD__
+#if _BYTE_ORDER == _BIG_ENDIAN
+	uchar_t order = ELFDATA2MSB;
+#else
+	uchar_t order = ELFDATA2LSB;
+#endif
+#else
 #ifdef _BIG_ENDIAN
 	uchar_t order = ELFDATA2MSB;
 #else
 	uchar_t order = ELFDATA2LSB;
+#endif
 #endif
 	ssize_t nbytes;
 
