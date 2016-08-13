@@ -38,8 +38,12 @@ extern int kt_cpustack(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kt_cpuregs(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kt_regs(uintptr_t, uint_t, int, const mdb_arg_t *);
 
+#ifdef __FreeBSD__
+extern void kt_pcb_to_kregs(struct pcb *, mdb_tgt_gregset_t *);
+#else
 extern int kt_kvmregs(mdb_tgt_t *, uint_t, mdb_tgt_gregset_t *);
 extern void kt_regs_to_kregs(struct regs *, mdb_tgt_gregset_t *);
+#endif
 
 extern int kt_putareg(mdb_tgt_t *, mdb_tgt_tid_t, const char *, mdb_tgt_reg_t);
 extern int kt_getareg(mdb_tgt_t *, mdb_tgt_tid_t,

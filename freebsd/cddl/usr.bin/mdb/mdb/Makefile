@@ -2,6 +2,7 @@
 
 MDB_DIR=	${.CURDIR}/../../../../../usr/src/cmd/mdb
 LIBDISASM_DIR=	${.CURDIR}/../../../../../usr/src/lib/libdisasm
+LIBSAVEARGS_DIR=${.CURDIR}/../../../../../usr/src/lib/libsaveargs
 DIS_DIR=	${.CURDIR}/../../../../../usr/src/common/dis
 
 PROG=	mdb
@@ -21,16 +22,26 @@ CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
 .PATH: ${MDB_DIR}/intel/amd64/mdb
 .PATH: ${MDB_DIR}/intel/mdb
 
-xSRCS+=	kvm_amd64dep.c \
-	kvm_isadep.c \
-	mdb_amd64util.c \
+TODO+=	\
 	proc_amd64dep.c
+
+SRCS+=	kvm_amd64dep_freebsd.c \
+	kvm_isadep.c \
+	mdb_amd64util.c
 
 CFLAGS+= -I${MDB_DIR}/intel/mdb
 CFLAGS+= -I${MDB_DIR}/intel/amd64/mdb
 CFLAGS+= -I${MDB_DIR}/intel
 
 # ???: CPPFLAGS+= -D_ELF64
+
+.PATH: ${LIBSAVEARGS_DIR}/amd64
+
+SRCS+=	saveargs.c
+
+CFLAGS+= -I${LIBSAVEARGS_DIR}/common
+CWARNFLAGS.saveargs.c=	-Wno-missing-prototypes
+
 .else
 .error "Unsupported platform"
 .endif

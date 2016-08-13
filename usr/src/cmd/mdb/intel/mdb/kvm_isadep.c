@@ -37,13 +37,19 @@
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_errno.h>
 #include <mdb/mdb_err.h>
+#ifdef __FreeBSD__
+#include <mdb/mdb_kvm_freebsd.h>
+#else
 #include <mdb/mdb_kvm.h>
+#endif
 #include <mdb/mdb_ks.h>
 #include <mdb/mdb.h>
 #include <mdb/kvm_isadep.h>
 
+#ifndef __FreeBSD__
 #include <sys/cpuvar.h>
 #include <sys/privmregs.h>
+#endif
 
 int
 kt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
@@ -101,6 +107,7 @@ kt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 	return (set_errno(EMDB_BADREG));
 }
 
+#if 0
 int
 kt_kvmregs(mdb_tgt_t *t, uint_t cpuid, mdb_tgt_gregset_t *kregs)
 {
@@ -207,3 +214,4 @@ kt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (kt_regs((uintptr_t)&regs, flags, argc, argv));
 }
+#endif

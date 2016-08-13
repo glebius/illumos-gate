@@ -64,6 +64,7 @@
 #include <errno.h>
 #endif
 #include <limits.h>
+#include <paths.h>
 
 #include <mdb/mdb_target_impl.h>
 #include <mdb/mdb_err.h>
@@ -76,13 +77,14 @@
 #include <mdb/mdb_module.h>
 #include <mdb/mdb.h>
 
-#if 0
 #define	KT_RELOC_BUF(buf, obase, nbase) \
 	((uintptr_t)(buf) - (uintptr_t)(obase) + (uintptr_t)(nbase))
 
+#if 0
 #define	KT_BAD_BUF(buf, base, size) \
 	((uintptr_t)(buf) < (uintptr_t)(base) || \
 	((uintptr_t)(buf) >= (uintptr_t)(base) + (uintptr_t)(size)))
+#endif
 
 typedef struct kt_symarg {
 	mdb_tgt_sym_f *sym_cb;		/* Caller's callback function */
@@ -92,6 +94,7 @@ typedef struct kt_symarg {
 	const char *sym_obj;		/* Containing object */
 } kt_symarg_t;
 
+#if 0
 typedef struct kt_maparg {
 	mdb_tgt_t *map_target;		/* Target used for mapping iter */
 	mdb_tgt_map_f *map_cb;		/* Caller's callback function */
@@ -99,7 +102,8 @@ typedef struct kt_maparg {
 } kt_maparg_t;
 
 static const char KT_MODULE[] = "mdb_ks";
-static const char KT_CTFPARENT[] = "genunix";
+#endif
+static const char KT_CTFPARENT[] = "kernel";
 
 static void
 kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
@@ -119,6 +123,7 @@ kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 	    &km->km_strtab_hdr, km->km_strtab, MDB_TGT_SYMTAB);
 }
 
+#if 0
 static void
 kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 {
@@ -276,60 +281,44 @@ kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 
 	} while ((addr = (uintptr_t)ctl.mod_next) != head);
 }
+#endif
 
 int
 kt_setflags(mdb_tgt_t *t, int flags)
 {
-	int iochg = ((flags ^ t->t_flags) & MDB_TGT_F_ALLOWIO) &&
-	    !mdb_prop_postmortem;
 	int rwchg = (flags ^ t->t_flags) & MDB_TGT_F_RDWR;
 	kt_data_t *kt = t->t_data;
-	const char *kvmfile;
 	void *cookie;
+	char errbuf[_POSIX2_LINE_MAX];
 	int mode;
 
-	if (!iochg && !rwchg)
+	if (!rwchg)
 		return (0);
-
-	if (kt->k_xpv_domu) {
-		warn("read-only target");
-		return (-1);
-	}
-
-	if (iochg) {
-		kvmfile = (flags & MDB_TGT_F_ALLOWIO) ? "/dev/allkmem" :
-		    "/dev/kmem";
-	} else {
-		kvmfile = kt->k_kvmfile;
-	}
 
 	mode = (flags & MDB_TGT_F_RDWR) ? O_RDWR : O_RDONLY;
 
-	if ((cookie = kt->k_kb_ops->kb_open(kt->k_symfile, kvmfile, NULL, mode,
-	    mdb.m_pname)) == NULL) {
+	cookie = kvm_openfiles(kt->k_symfile, kt->k_kvmfile, NULL, mode,
+	    errbuf);
+	if (cookie == NULL) {
 		/* We failed to re-open, so don't change t_flags */
 		warn("failed to re-open target");
 		return (-1);
 	}
 
 	/*
-	 * We successfully reopened the target, so update k_kvmfile.  Also set
-	 * the RDWR and ALLOWIO bits in t_flags to match those in flags.
+	 * We successfully reopened the target, so update k_cookie.  Also set
+	 * the RDWR bit in t_flags to match those in flags.
 	 */
-	(void) kt->k_kb_ops->kb_close(kt->k_cookie);
+	(void) kvm_close(kt->k_cookie);
 	kt->k_cookie = cookie;
 
-	if (kvmfile != kt->k_kvmfile) {
-		strfree(kt->k_kvmfile);
-		kt->k_kvmfile = strdup(kvmfile);
-	}
-
-	t->t_flags = (t->t_flags & ~(MDB_TGT_F_RDWR | MDB_TGT_F_ALLOWIO)) |
-	    (flags & (MDB_TGT_F_RDWR | MDB_TGT_F_ALLOWIO));
+	t->t_flags = (t->t_flags & ~(MDB_TGT_F_RDWR)) |
+	    (flags & (MDB_TGT_F_RDWR));
 
 	return (0);
 }
 
+#if 0
 /*
  * Determine which PIDs (if any) have their pages saved in the dump.  We
  * do this by looking for content flags in dump_flags in the header.  These
@@ -387,10 +376,18 @@ procnotfound:
 	warn("unable to determine whether dump contains proc %p\n", context);
 	return (1);
 }
+#endif
 
 int
 kt_setcontext(mdb_tgt_t *t, void *context)
 {
+#if 1
+	if (context != NULL) {
+		warn("kproc not yet supported");
+		return (-1);
+	}
+	return (0);
+#else
 	if (context != NULL) {
 		const char *argv[2];
 		int argc = 0;
@@ -417,6 +414,7 @@ kt_setcontext(mdb_tgt_t *t, void *context)
 		mdb_printf("debugger context set to kernel\n");
 
 	return (0);
+#endif
 }
 
 static int
@@ -473,6 +471,7 @@ kt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+#if 0
 	kt_data_t *kt = mdb.m_target->t_data;
 	struct utsname uts;
 
@@ -508,6 +507,7 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("image uuid: %s\n", uuid);
 		}
 	}
+#endif
 
 	return (DCMD_OK);
 }
@@ -559,15 +559,18 @@ kt_activate(mdb_tgt_t *t)
 {
 	static const mdb_nv_disc_t reg_disc = { NULL, reg_disc_get };
 	kt_data_t *kt = t->t_data;
+#if 0
 	void *sym;
 
 	int oflag;
+#endif
 
-	mdb_prop_postmortem = kt->k_xpv_domu || (kt->k_dumphdr != NULL);
+	mdb_prop_postmortem = strcmp(kt->k_kvmfile, _PATH_MEM) != 0;
 	mdb_prop_kernel = TRUE;
 	mdb_prop_datamodel = MDB_TGT_MODEL_NATIVE;
 
 	if (kt->k_activated == FALSE) {
+#if 0
 		struct utsname u1, u2;
 		/*
 		 * If we're examining a crash dump, root is /, and uname(2)
@@ -630,6 +633,7 @@ kt_activate(mdb_tgt_t *t)
 			mdb_iob_puts(mdb.m_out, " ]\n");
 			mdb_iob_setflags(mdb.m_out, oflag);
 		}
+#endif
 
 		kt->k_activated = TRUE;
 	}
@@ -689,8 +693,12 @@ kt_platform(mdb_tgt_t *t)
 int
 kt_uname(mdb_tgt_t *t, struct utsname *utsp)
 {
+#if 0
 	return (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, utsp,
 	    sizeof (struct utsname), MDB_TGT_OBJ_EXEC, "utsname"));
+#else
+	return mdb_tgt_notsup();
+#endif
 }
 
 /*ARGSUSED*/
@@ -700,6 +708,7 @@ kt_dmodel(mdb_tgt_t *t)
 	return (MDB_TGT_MODEL_NATIVE);
 }
 
+#if 0
 ssize_t
 kt_aread(mdb_tgt_t *t, mdb_tgt_as_t as, void *buf,
     size_t nbytes, mdb_tgt_addr_t addr)
@@ -727,6 +736,7 @@ kt_awrite(mdb_tgt_t *t, mdb_tgt_as_t as, const void *buf,
 
 	return (rval);
 }
+#endif
 
 ssize_t
 kt_vread(mdb_tgt_t *t, void *buf, size_t nbytes, uintptr_t addr)
@@ -734,8 +744,7 @@ kt_vread(mdb_tgt_t *t, void *buf, size_t nbytes, uintptr_t addr)
 	kt_data_t *kt = t->t_data;
 	ssize_t rval;
 
-	if ((rval = kt->k_kb_ops->kb_kread(kt->k_cookie, addr, buf,
-	    nbytes)) == -1)
+	if ((rval = kvm_read(kt->k_cookie, addr, buf, nbytes)) == -1)
 		return (set_errno(EMDB_NOMAP));
 
 	return (rval);
@@ -747,8 +756,7 @@ kt_vwrite(mdb_tgt_t *t, const void *buf, size_t nbytes, uintptr_t addr)
 	kt_data_t *kt = t->t_data;
 	ssize_t rval;
 
-	if ((rval = kt->k_kb_ops->kb_kwrite(kt->k_cookie, addr, buf,
-	    nbytes)) == -1)
+	if ((rval = kvm_write(kt->k_cookie, addr, buf, nbytes)) == -1)
 		return (set_errno(EMDB_NOMAP));
 
 	return (rval);
@@ -766,6 +774,7 @@ kt_fwrite(mdb_tgt_t *t, const void *buf, size_t nbytes, uintptr_t addr)
 	return (kt_vwrite(t, buf, nbytes, addr));
 }
 
+#if 0
 ssize_t
 kt_pread(mdb_tgt_t *t, void *buf, size_t nbytes, physaddr_t addr)
 {
@@ -832,6 +841,7 @@ kt_vtop(mdb_tgt_t *t, mdb_tgt_as_t as, uintptr_t va, physaddr_t *pap)
 
 	return (set_errno(EMDB_NOMAP));
 }
+#endif
 
 int
 kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
@@ -860,9 +870,11 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 		n = mdb_nv_size(&kt->k_modules) + 1;
 		break;
 
+#if 0
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
 		obj = kt->k_rtld_name;
 		/*FALLTHRU*/
+#endif
 
 	default:
 		if ((v = mdb_nv_lookup(&kt->k_modules, obj)) == NULL)
@@ -1050,9 +1062,11 @@ kt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 		}
 		break;
 
+#if 0
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
 		obj = kt->k_rtld_name;
 		/*FALLTHRU*/
+#endif
 
 	default:
 		v = mdb_nv_lookup(&kt->k_modules, obj);
@@ -1074,6 +1088,7 @@ kt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 	return (0);
 }
 
+#if 0
 static int
 kt_mapping_walk(uintptr_t addr, const void *data, kt_maparg_t *marg)
 {
@@ -1119,6 +1134,7 @@ kt_mapping_iter(mdb_tgt_t *t, mdb_tgt_map_f *func, void *private)
 	return (mdb_pwalk("seg", (mdb_walk_cb_t)kt_mapping_walk, &m,
 	    (uintptr_t)kt->k_as));
 }
+#endif
 
 static const mdb_map_t *
 kt_module_to_map(kt_module_t *km, mdb_map_t *map)
@@ -1178,8 +1194,10 @@ kt_name_to_map(mdb_tgt_t *t, const char *name)
 	if (name == MDB_TGT_OBJ_EXEC)
 		return (kt_module_to_map(mdb_list_next(&kt->k_modlist), &m));
 
+#if 0
 	if (name == MDB_TGT_OBJ_RTLD)
 		name = kt->k_rtld_name;
+#endif
 
 	if ((km = kt_module_by_name(kt, name)) != NULL)
 		return (kt_module_to_map(km, &m));
@@ -1197,7 +1215,7 @@ kt_load_ctfdata(mdb_tgt_t *t, kt_module_t *km)
 	if (km->km_ctfp != NULL)
 		return (km->km_ctfp);
 
-	if (km->km_ctf_va == NULL) {
+	if (km->km_ctf_va == 0) {
 		(void) set_errno(EMDB_NOCTF);
 		return (NULL);
 	}
@@ -1286,8 +1304,10 @@ kt_name_to_ctf(mdb_tgt_t *t, const char *name)
 
 	if (name == MDB_TGT_OBJ_EXEC)
 		name = KT_CTFPARENT;
+#if 0
 	else if (name == MDB_TGT_OBJ_RTLD)
 		name = kt->k_rtld_name;
+#endif
 
 	if ((km = kt_module_by_name(kt, name)) != NULL)
 		return (kt_load_ctfdata(t, km));
@@ -1302,11 +1322,12 @@ kt_status(mdb_tgt_t *t, mdb_tgt_status_t *tsp)
 {
 	kt_data_t *kt = t->t_data;
 	bzero(tsp, sizeof (mdb_tgt_status_t));
-	tsp->st_state = (kt->k_xpv_domu || (kt->k_dumphdr != NULL)) ?
+	tsp->st_state = strcmp(kt->k_kvmfile, _PATH_MEM) != 0 ?
 	    MDB_TGT_DEAD : MDB_TGT_RUNNING;
 	return (0);
 }
 
+#if 0
 static ssize_t
 kt_xd_dumphdr(mdb_tgt_t *t, void *buf, size_t nbytes)
 {
@@ -1323,6 +1344,7 @@ kt_xd_dumphdr(mdb_tgt_t *t, void *buf, size_t nbytes)
 
 	return (nbytes);
 }
+#endif
 
 void
 kt_destroy(mdb_tgt_t *t)
@@ -1330,7 +1352,9 @@ kt_destroy(mdb_tgt_t *t)
 	kt_data_t *kt = t->t_data;
 	kt_module_t *km, *nkm;
 
+#if 0
 	(void) mdb_module_unload(KT_MODULE, 0);
+#endif
 
 	if (kt->k_regs != NULL)
 		mdb_free(kt->k_regs, kt->k_regsize);
@@ -1341,12 +1365,14 @@ kt_destroy(mdb_tgt_t *t)
 	if (kt->k_dynsym != NULL)
 		mdb_gelf_symtab_destroy(kt->k_dynsym);
 
+#if 0
 	if (kt->k_dumphdr != NULL)
 		mdb_free(kt->k_dumphdr, sizeof (dumphdr_t));
+#endif
 
 	mdb_gelf_destroy(kt->k_file);
 
-	(void) kt->k_kb_ops->kb_close(kt->k_cookie);
+	(void) kvm_close(kt->k_cookie);
 
 	for (km = mdb_list_next(&kt->k_modlist); km; km = nkm) {
 		if (km->km_symtab)
@@ -1375,6 +1401,7 @@ kt_destroy(mdb_tgt_t *t)
 	mdb_free(kt, sizeof (kt_data_t));
 }
 
+#if 0
 static int
 kt_data_stub(void)
 {
@@ -1402,7 +1429,7 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 		    kt->k_kvmfile, NULL, oflag, errbuf);
 
 		if (kt->k_cookie == NULL) {
-			warn("failed to open vmcore: %s", errbuf);
+			mdb_warn("failed to open vmcore: %s", errbuf);
 			goto err;
 		}
 	} else {
@@ -1425,6 +1452,8 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	kt->k_dynsym =
 	    mdb_gelf_symtab_create_file(kt->k_file, SHT_DYNSYM, MDB_TGT_DYNSYM);
 
+	/* XXX */
+	snprintf(kt->k_platform, sizeof(kt->k_platform), "amd64");
 #if 0
 	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "kas",
 	    &sym, NULL) == -1) {
@@ -1475,21 +1504,14 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	t->t_pshandle = kt->k_cookie;
 	t->t_data = kt;
 
-#if 0
-#if defined(__sparc)
-#if defined(__sparcv9)
-	kt_sparcv9_init(t);
-#else
-	kt_sparcv7_init(t);
-#endif
-#elif defined(__amd64)
+#ifdef __amd64__
 	kt_amd64_init(t);
-#elif defined(__i386)
-	kt_ia32_init(t);
 #else
 #error	"unknown ISA"
 #endif
 
+	/* XXX: Todo: dumppcb / dumptid for crash dumps. */
+#if 0
 	/*
 	 * We read our representative thread ID (address) from the kernel's
 	 * global panic_thread.  It will remain 0 if this is a live kernel.

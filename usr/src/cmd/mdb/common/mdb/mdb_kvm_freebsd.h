@@ -45,7 +45,6 @@ extern "C" {
 
 #ifdef _MDB
 
-#ifdef notyet
 typedef struct kt_module {
 	mdb_list_t km_list;		/* List forward/back pointers */
 	char *km_name;			/* Module name */
@@ -70,7 +69,6 @@ typedef struct kt_module {
 	void *km_ctf_buf;		/* CTF data for this module */
 	ctf_file_t *km_ctfp;		/* CTF container for this module */
 } kt_module_t;
-#endif
 
 typedef struct kt_data {
 #if 0
@@ -82,8 +80,8 @@ typedef struct kt_data {
 #if 0
 	int k_xpv_domu;			/* Hypervisor domain dump? */
 	const char *k_rtld_name;	/* module containing krtld */
-	mdb_map_t k_map;		/* Persistant map for callers */
 #endif
+	mdb_map_t k_map;		/* Persistant map for callers */
 	kvm_t *k_cookie;		/* Cookie for libkvm routines */
 #if 0
 	struct as *k_as;		/* Kernel VA of kas struct */
@@ -92,7 +90,6 @@ typedef struct kt_data {
 	mdb_gelf_file_t *k_file;	/* ELF file object */
 	mdb_gelf_symtab_t *k_symtab;	/* Standard symbol table */
 	mdb_gelf_symtab_t *k_dynsym;	/* Dynamic symbol table */
-#if 0
 	mdb_nv_t k_modules;		/* Hash table of modules */
 	mdb_list_t k_modlist;		/* List of modules in load order */
 	char k_platform[MAXNAMELEN];	/* Platform string */
@@ -106,11 +103,14 @@ typedef struct kt_data {
 	mdb_dcmd_f *k_dcmd_stackr;	/* Dcmd to print stack trace and regs */
 	mdb_dcmd_f *k_dcmd_cpustack;	/* Dcmd to print CPU stack trace */
 	mdb_dcmd_f *k_dcmd_cpuregs;	/* Dcmd to print CPU registers */
+#if 0
 	GElf_Sym k_intr_sym;		/* Kernel locore cmnint symbol */
 	GElf_Sym k_trap_sym;		/* Kernel locore cmntrap symbol */
 	struct dumphdr *k_dumphdr;	/* Dump header for post-mortem */
 	pid_t k_dumpcontent;		/* The pid(s) (if any) in the dump */
+#endif
 	int k_activated;		/* Set if kt_activate called */
+#if 0
 	int k_ctfvalid;			/* Set if kernel has a CTF arena */
 #endif
 } kt_data_t;
@@ -120,7 +120,6 @@ typedef struct kt_data {
 #define	KT_DUMPCONTENT_INVALID	-1
 #define	KT_DUMPCONTENT_ALL	-2
 
-#if 0
 extern int kt_setflags(mdb_tgt_t *, int);
 extern int kt_setcontext(mdb_tgt_t *, void *);
 
@@ -133,20 +132,26 @@ extern const char *kt_platform(mdb_tgt_t *);
 extern int kt_uname(mdb_tgt_t *, struct utsname *);
 extern int kt_dmodel(mdb_tgt_t *);
 
+#if 0
 extern ssize_t kt_aread(mdb_tgt_t *, mdb_tgt_as_t,
     void *, size_t, mdb_tgt_addr_t);
 
 extern ssize_t kt_awrite(mdb_tgt_t *, mdb_tgt_as_t,
     const void *, size_t, mdb_tgt_addr_t);
+#endif
 
 extern ssize_t kt_vread(mdb_tgt_t *, void *, size_t, uintptr_t);
 extern ssize_t kt_vwrite(mdb_tgt_t *, const void *, size_t, uintptr_t);
+#if 0
 extern ssize_t kt_pread(mdb_tgt_t *, void *, size_t, physaddr_t);
 extern ssize_t kt_pwrite(mdb_tgt_t *, const void *, size_t, physaddr_t);
+#endif
 extern ssize_t kt_fread(mdb_tgt_t *, void *, size_t, uintptr_t);
 extern ssize_t kt_fwrite(mdb_tgt_t *, const void *, size_t, uintptr_t);
 
+#if 0
 extern int kt_vtop(mdb_tgt_t *, mdb_tgt_as_t, uintptr_t, physaddr_t *);
+#endif
 
 extern int kt_lookup_by_name(mdb_tgt_t *, const char *,
     const char *, GElf_Sym *, mdb_syminfo_t *);
@@ -157,7 +162,9 @@ extern int kt_lookup_by_addr(mdb_tgt_t *, uintptr_t,
 extern int kt_symbol_iter(mdb_tgt_t *, const char *, uint_t,
     uint_t, mdb_tgt_sym_f *, void *);
 
+#if 0
 extern int kt_mapping_iter(mdb_tgt_t *, mdb_tgt_map_f *, void *);
+#endif
 extern int kt_object_iter(mdb_tgt_t *, mdb_tgt_map_f *, void *);
 
 extern const mdb_map_t *kt_addr_to_map(mdb_tgt_t *, uintptr_t);
@@ -176,6 +183,7 @@ extern void kt_ia32_init(mdb_tgt_t *);
 extern void kt_amd64_init(mdb_tgt_t *);
 #endif	/* __sparc */
 
+#if 0
 typedef int (*mdb_name_lookup_fcn_t)(const char *, GElf_Sym *);
 typedef int (*mdb_addr_lookup_fcn_t)(uintptr_t, int, char *, size_t,
     GElf_Sym *);

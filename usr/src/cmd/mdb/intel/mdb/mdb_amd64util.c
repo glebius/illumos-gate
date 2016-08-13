@@ -30,8 +30,10 @@
  */
 
 #include <sys/types.h>
+#ifndef __FreeBSD__
 #include <sys/reg.h>
 #include <sys/privregs.h>
+#endif
 #include <sys/stack.h>
 #include <sys/frame.h>
 
@@ -52,8 +54,10 @@
  */
 
 const mdb_tgt_regdesc_t mdb_amd64_kregs[] = {
+#ifndef __FreeBSD__
 	{ "savfp", KREG_SAVFP, MDB_TGT_R_EXPORT },
 	{ "savpc", KREG_SAVPC, MDB_TGT_R_EXPORT },
+#endif
 	{ "rdi", KREG_RDI, MDB_TGT_R_EXPORT },
 	{ "edi", KREG_RDI, MDB_TGT_R_EXPORT | MDB_TGT_R_32 },
 	{ "di",  KREG_RDI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
@@ -224,14 +228,18 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	GElf_Sym s;
 	mdb_syminfo_t sip;
 	mdb_ctf_funcinfo_t mfp;
+#ifndef __FreeBSD__
 	int xpv_panic = 0;
+#endif
 	int advance_tortoise = 1;
 	uintptr_t tortoise_fp = 0;
+#ifndef __FreeBSD__
 #ifndef	_KMDB
 	int xp;
 
 	if ((mdb_readsym(&xp, sizeof (xp), "xpv_panicking") != -1) && (xp > 0))
 		xpv_panic = 1;
+#endif
 #endif
 
 	bcopy(gsp, &gregs, sizeof (gregs));
@@ -375,10 +383,15 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		if (got_pc && func(arg, pc, argc, fr_argv, &gregs) != 0)
 			break;
 
+#ifdef __FreeBSD__
+		/* TODO: trapframes */
+#endif
+
 		kregs[KREG_RSP] = kregs[KREG_RBP];
 
 		lastfp = fp;
 		fp = fr.fr_savfp;
+#ifndef __FreeBSD__
 		/*
 		 * The Xen hypervisor marks a stack frame as belonging to
 		 * an exception by inverting the bits of the pointer to
@@ -390,6 +403,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			if ((fp != 0) && (fp < lastfp) &&
 			    ((lastfp ^ ~fp) < 0xfff))
 				fp = ~fp;
+#endif
 
 		kregs[KREG_RBP] = fp;
 		kregs[KREG_RIP] = pc = fr.fr_savpc;
