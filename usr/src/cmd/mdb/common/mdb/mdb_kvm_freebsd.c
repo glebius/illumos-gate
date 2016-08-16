@@ -1509,8 +1509,8 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	    NULL) == 0 && !(mdb.m_flags & MDB_FL_NOCTF))
 		kt->k_ctfvalid = 1;
 
-	(void) mdb_nv_create(&kt->k_modules, UM_SLEEP);
 #endif
+	(void) mdb_nv_create(&kt->k_modules, UM_SLEEP);
 	t->t_pshandle = kt->k_cookie;
 	t->t_data = kt;
 
