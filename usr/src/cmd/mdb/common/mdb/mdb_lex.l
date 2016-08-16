@@ -780,9 +780,10 @@ mdb_lex_state_create(mdb_frame_t *f)
 void
 mdb_lex_state_destroy(mdb_frame_t *f)
 {
-	ASSERT(YY_CURRENT_BUFFER != (YY_BUFFER_STATE)f->f_lstate);
+	ASSERT(YY_CURRENT_BUFFER != f->f_lstate->state);
 
-	yy_delete_buffer((YY_BUFFER_STATE)f->f_lstate);
+	yy_delete_buffer(f->f_lstate->state);
+	mdb_free(f->f_lstate, sizeof (mdb_lex_state_t));
 	f->f_lstate = NULL;
 	mdb_argvec_destroy(&f->f_argvec);
 }
