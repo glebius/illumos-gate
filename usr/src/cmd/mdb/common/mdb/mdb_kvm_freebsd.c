@@ -471,7 +471,17 @@ kt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-#if 0
+#if 1
+	kt_data_t *kt = mdb.m_target->t_data;
+
+	if (mdb_prop_postmortem) {
+		mdb_printf("debugging crash dump %s (%d-bit)\n",
+		    kt->k_kvmfile, (int)(sizeof (void *) * NBBY));
+	} else {
+		mdb_printf("debugging live kernel %s (%d-bit)\n",
+		    kt->k_symfile, (int)(sizeof (void *) * NBBY));
+	}
+#else
 	kt_data_t *kt = mdb.m_target->t_data;
 	struct utsname uts;
 
