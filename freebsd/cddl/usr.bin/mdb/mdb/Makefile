@@ -134,9 +134,6 @@ TODO+= \
 
 CFLAGS+= -D_MDB -I${MDB_DIR}/common
 
-LIBADD=	curses kvm proc rtld_db ctf umem elf util z
-
-# For 10.x
 LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -lelf -lutil -lz
 
 SRCS+=	mdb_lex.l \
