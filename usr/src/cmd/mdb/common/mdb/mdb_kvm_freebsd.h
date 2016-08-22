@@ -48,11 +48,13 @@ extern "C" {
 typedef struct kt_module {
 	mdb_list_t km_list;		/* List forward/back pointers */
 	char *km_name;			/* Module name */
-	void *km_data;			/* Data buffer (module->symspace) */
-	size_t km_datasz;		/* Size of km_data in bytes */
-	void *km_symbuf;		/* Base of symbol table in km_data */
-	char *km_strtab;		/* Base of string table in km_data */
+	char *km_pathname;
+	mdb_gelf_file_t *km_file;	/* ELF file object */
+	
 	mdb_gelf_symtab_t *km_symtab;	/* Symbol table for module */
+	uintptr_t km_va;		/* Base kernel VA of module */
+	size_t km_size;			/* Size of module */
+#if 0
 	uintptr_t km_symspace_va;	/* Kernel VA of krtld symspace */
 	uintptr_t km_symtab_va;		/* Kernel VA of krtld symtab */
 	uintptr_t km_strtab_va;		/* Kernel VA of krtld strtab */
@@ -67,6 +69,7 @@ typedef struct kt_module {
 	uintptr_t km_ctf_va;		/* Kernel VA of CTF data */
 	size_t km_ctf_size;		/* Size of CTF data */
 	void *km_ctf_buf;		/* CTF data for this module */
+#endif
 	ctf_file_t *km_ctfp;		/* CTF container for this module */
 } kt_module_t;
 

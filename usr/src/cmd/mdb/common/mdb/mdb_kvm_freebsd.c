@@ -77,10 +77,10 @@
 #include <mdb/mdb_module.h>
 #include <mdb/mdb.h>
 
+#if 0
 #define	KT_RELOC_BUF(buf, obase, nbase) \
 	((uintptr_t)(buf) - (uintptr_t)(obase) + (uintptr_t)(nbase))
 
-#if 0
 #define	KT_BAD_BUF(buf, base, size) \
 	((uintptr_t)(buf) < (uintptr_t)(base) || \
 	((uintptr_t)(buf) >= (uintptr_t)(base) + (uintptr_t)(size)))
@@ -108,163 +108,118 @@ static const char KT_CTFPARENT[] = "kernel";
 static void
 kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 {
-	km->km_data = mdb_alloc(km->km_datasz, UM_SLEEP);
+	mdb_io_t *fio;
 
-	(void) mdb_tgt_vread(t, km->km_data, km->km_datasz, km->km_symspace_va);
+	fio = mdb_fdio_create_path(NULL, km->km_pathname, O_RDONLY, 0);
+	if (fio == NULL)
+		return;
 
-	km->km_symbuf = (void *)
-	    KT_RELOC_BUF(km->km_symtab_va, km->km_symspace_va, km->km_data);
+	km->km_file = mdb_gelf_create(fio, ET_EXEC, GF_FILE);
+	if (km->km_file == NULL) {
+		mdb_io_destroy(fio);
+		return;
+	}
 
-	km->km_strtab = (char *)
-	    KT_RELOC_BUF(km->km_strtab_va, km->km_symspace_va, km->km_data);
-
-	km->km_symtab = mdb_gelf_symtab_create_raw(&kt->k_file->gf_ehdr,
-	    &km->km_symtab_hdr, km->km_symbuf,
-	    &km->km_strtab_hdr, km->km_strtab, MDB_TGT_SYMTAB);
+	km->km_symtab =
+	    mdb_gelf_symtab_create_file(km->km_file, SHT_SYMTAB,
+		MDB_TGT_SYMTAB);
 }
 
-#if 0
 static void
 kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 {
-	char name[MAXNAMELEN];
-	uintptr_t addr, head;
-
-	struct module kmod;
-	struct modctl ctl;
-	Shdr symhdr, strhdr;
-	GElf_Sym sym;
+	char name[NAME_MAX + 1];
+	char pathname[PATH_MAX];
+	uintptr_t addr, base, lf;
+	size_t size;
+	int kld_off_address, kld_off_filename, kld_off_pathname, kld_off_next;
 
 	kt_module_t *km;
 
-	if (mdb_tgt_lookup_by_name(t, MDB_TGT_OBJ_EXEC,
-	    "modules", &sym, NULL) == -1) {
-		warn("failed to get 'modules' symbol");
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &lf, sizeof (lf),
+	    MDB_TGT_OBJ_EXEC, "linker_files") != sizeof (lf)) {
+		warn("failed to read 'linker_files' pointer");
 		return;
 	}
 
-	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &ctl, sizeof (ctl),
-	    MDB_TGT_OBJ_EXEC, "modules") != sizeof (ctl)) {
-		warn("failed to read 'modules' struct");
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &kld_off_address,
+	    sizeof (kld_off_address), MDB_TGT_OBJ_EXEC, "kld_off_address") !=
+	    sizeof (kld_off_address) ||
+	    mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &kld_off_filename,
+	    sizeof (kld_off_filename), MDB_TGT_OBJ_EXEC, "kld_off_filename") !=
+	    sizeof (kld_off_filename) ||
+	    mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &kld_off_pathname,
+	    sizeof (kld_off_pathname), MDB_TGT_OBJ_EXEC, "kld_off_pathname") !=
+	    sizeof (kld_off_pathname) ||
+	    mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &kld_off_next,
+	    sizeof (kld_off_next), MDB_TGT_OBJ_EXEC, "kld_off_next") !=
+	    sizeof (kld_off_next)) {
+#if 0
+		/*
+		 * mdb doesn't support cross debugging, so fall back to
+		 * static values and hope for the best.
+		 */
+		kld_off_address = offsetof(struct linker_file, address);
+		kld_off_filename = offsetof(struct linker_file, filename);
+		kld_off_pathname = offsetof(struct linker_file, pathname);
+		kld_off_next = offsetof(struct linker_file, link.tqe_next);
+#else
+		warn("failed to read linker_file layout variables");
 		return;
+#endif
 	}
 
-	addr = head = (uintptr_t)sym.st_value;
-
-	do {
-		if (addr == NULL)
-			break; /* Avoid spurious NULL pointers in list */
-
-		if (mdb_tgt_vread(t, &ctl, sizeof (ctl), addr) == -1) {
-			warn("failed to read modctl at %p", (void *)addr);
+	while (lf != 0) {
+		if (mdb_tgt_vread(t, &addr, sizeof (addr),
+		    lf + kld_off_filename) != sizeof (addr) ||
+		    mdb_tgt_readstr(t, MDB_TGT_AS_VIRT, name, sizeof(name),
+		    addr) == -1) {
+			warn("failed to read module name at %p",
+			    (void *)(lf + kld_off_filename));
 			return;
 		}
 
-		if (ctl.mod_mp == NULL)
-			continue; /* No associated krtld structure */
-
-		if (mdb_tgt_readstr(t, MDB_TGT_AS_VIRT, name, MAXNAMELEN,
-		    (uintptr_t)ctl.mod_modname) <= 0) {
-			warn("failed to read module name at %p",
-			    (void *)ctl.mod_modname);
-			continue;
-		}
-
 		mdb_dprintf(MDB_DBG_KMOD, "reading mod %s (%p)\n",
-		    name, (void *)addr);
+		    name, (void *)lf);
 
 		if (mdb_nv_lookup(&kt->k_modules, name) != NULL) {
-			warn("skipping duplicate module '%s', id=%d\n",
-			    name, ctl.mod_id);
-			continue;
+			warn("skipping duplicate module '%s'\n",
+			    name);
+			goto next_module;
 		}
 
-		if (mdb_tgt_vread(t, &kmod, sizeof (kmod),
-		    (uintptr_t)ctl.mod_mp) == -1) {
-			warn("failed to read module at %p\n",
-			    (void *)ctl.mod_mp);
-			continue;
+		if (mdb_tgt_vread(t, &addr, sizeof (addr),
+		    lf + kld_off_pathname) != sizeof (addr) ||
+		    mdb_tgt_readstr(t, MDB_TGT_AS_VIRT, pathname,
+		    sizeof(pathname), addr) == -1) {
+			warn("failed to read path for module '%s'\n",
+			    name);
+			return;
 		}
 
-		if (kmod.symspace == NULL || kmod.symhdr == NULL ||
-		    kmod.strhdr == NULL) {
-			/*
-			 * If no buffer for the symbols has been allocated,
-			 * or the shdrs for .symtab and .strtab are missing,
-			 * then we're out of luck.
-			 */
-			continue;
+		if (mdb_tgt_vread(t, &base, sizeof (base), lf +
+		    kld_off_address) != sizeof(base)) {
+			warn("failed to read base address for module '%s'\n",
+			    name);
+			return;
 		}
 
-		if (mdb_tgt_vread(t, &symhdr, sizeof (Shdr),
-		    (uintptr_t)kmod.symhdr) == -1) {
-			warn("failed to read .symtab header for '%s', id=%d",
-			    name, ctl.mod_id);
-			continue;
-		}
-
-		if (mdb_tgt_vread(t, &strhdr, sizeof (Shdr),
-		    (uintptr_t)kmod.strhdr) == -1) {
-			warn("failed to read .strtab header for '%s', id=%d",
-			    name, ctl.mod_id);
-			continue;
-		}
-
-		/*
-		 * Now get clever: f(*^ing krtld didn't used to bother updating
-		 * its own kmod.symsize value.  We know that prior to this bug
-		 * being fixed, symspace was a contiguous buffer containing
-		 * .symtab, .strtab, and the symbol hash table in that order.
-		 * So if symsize is zero, recompute it as the size of .symtab
-		 * plus the size of .strtab.  We don't need to load the hash
-		 * table anyway since we re-hash all the symbols internally.
-		 */
-		if (kmod.symsize == 0)
-			kmod.symsize = symhdr.sh_size + strhdr.sh_size;
-
-		/*
-		 * Similar logic can be used to make educated guesses
-		 * at the values of kmod.symtbl and kmod.strings.
-		 */
-		if (kmod.symtbl == NULL)
-			kmod.symtbl = kmod.symspace;
-		if (kmod.strings == NULL)
-			kmod.strings = kmod.symspace + symhdr.sh_size;
-
-		/*
-		 * Make sure things seem reasonable before we proceed
-		 * to actually read and decipher the symspace.
-		 */
-		if (KT_BAD_BUF(kmod.symtbl, kmod.symspace, kmod.symsize) ||
-		    KT_BAD_BUF(kmod.strings, kmod.symspace, kmod.symsize)) {
-			warn("skipping module '%s', id=%d (corrupt symspace)\n",
-			    name, ctl.mod_id);
-			continue;
+		if (mdb_tgt_vread(t, &size, sizeof (size), lf +
+		    kld_off_address + sizeof(base)) != sizeof(size)) {
+			warn("failed to read size for module '%s'\n",
+			    name);
+			return;
 		}
 
 		km = mdb_zalloc(sizeof (kt_module_t), UM_SLEEP);
 		km->km_name = strdup(name);
+		km->km_pathname = strdup(pathname);
 
 		(void) mdb_nv_insert(&kt->k_modules, km->km_name, NULL,
 		    (uintptr_t)km, MDB_NV_EXTNAME);
 
-		km->km_datasz = kmod.symsize;
-		km->km_symspace_va = (uintptr_t)kmod.symspace;
-		km->km_symtab_va = (uintptr_t)kmod.symtbl;
-		km->km_strtab_va = (uintptr_t)kmod.strings;
-		km->km_symtab_hdr = symhdr;
-		km->km_strtab_hdr = strhdr;
-		km->km_text_va = (uintptr_t)kmod.text;
-		km->km_text_size = kmod.text_size;
-		km->km_data_va = (uintptr_t)kmod.data;
-		km->km_data_size = kmod.data_size;
-		km->km_bss_va = (uintptr_t)kmod.bss;
-		km->km_bss_size = kmod.bss_size;
-
-		if (kt->k_ctfvalid) {
-			km->km_ctf_va = (uintptr_t)kmod.ctfdata;
-			km->km_ctf_size = kmod.ctfsize;
-		}
+		km->km_va = base;
+		km->km_size = size;
 
 		/*
 		 * Add the module to the end of the list of modules in load-
@@ -279,9 +234,15 @@ kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 			kt_load_module(kt, t, km);
 		}
 
-	} while ((addr = (uintptr_t)ctl.mod_next) != head);
+	next_module:
+		if (mdb_tgt_vread(t, &lf, sizeof (lf), lf +
+		    kld_off_next) != sizeof(lf)) {
+			warn("failed to read next module after '%s'\n",
+			    name);
+			return;
+		}
+	}
 }
-#endif
 
 int
 kt_setflags(mdb_tgt_t *t, int flags)
@@ -571,9 +532,9 @@ kt_activate(mdb_tgt_t *t)
 	kt_data_t *kt = t->t_data;
 #if 0
 	void *sym;
+#endif
 
 	int oflag;
-#endif
 
 	mdb_prop_postmortem = strcmp(kt->k_kvmfile, _PATH_MEM) != 0;
 	mdb_prop_kernel = TRUE;
@@ -613,6 +574,7 @@ kt_activate(mdb_tgt_t *t)
 
 			kt->k_dumpcontent = kt_find_dump_contents(kt);
 		}
+#endif
 
 		if (t->t_flags & MDB_TGT_F_PRELOAD) {
 			oflag = mdb_iob_getflags(mdb.m_out) & MDB_IOB_PGENABLE;
@@ -625,6 +587,7 @@ kt_activate(mdb_tgt_t *t)
 		if (!(t->t_flags & MDB_TGT_F_NOLOAD)) {
 			kt_load_modules(kt, t);
 
+#if 0
 			/*
 			 * Determine where the CTF data for krtld is. If krtld
 			 * is rolled into unix, force load the MDB krtld
@@ -636,6 +599,7 @@ kt_activate(mdb_tgt_t *t)
 				(void) mdb_module_load("krtld", MDB_MOD_SILENT);
 				kt->k_rtld_name = "unix";
 			}
+#endif
 		}
 
 
@@ -643,7 +607,6 @@ kt_activate(mdb_tgt_t *t)
 			mdb_iob_puts(mdb.m_out, " ]\n");
 			mdb_iob_setflags(mdb.m_out, oflag);
 		}
-#endif
 
 		kt->k_activated = TRUE;
 	}
@@ -945,14 +908,14 @@ kt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 
 	/*
 	 * Now iterate over the list of fake and real modules.  If the module
-	 * has no symbol table and the address is in the text section,
+	 * has no symbol table and the address is in the module's range,
 	 * instantiate the module's symbol table.  In exact mode, we can
 	 * jump to 'found' immediately if we match.  Otherwise we continue
 	 * looking and improve our choice if we find a closer symbol.
 	 */
 	for (km = &kmods[0]; km != NULL; km = mdb_list_next(km)) {
-		if (km->km_symtab == NULL && addr >= km->km_text_va &&
-		    addr < km->km_text_va + km->km_text_size)
+		if (km->km_symtab == NULL && addr >= km->km_va &&
+		    addr < km->km_va + km->km_size)
 			kt_load_module(kt, t, km);
 
 		if (mdb_gelf_symtab_lookup_by_addr(km->km_symtab, addr,
@@ -1151,8 +1114,8 @@ kt_module_to_map(kt_module_t *km, mdb_map_t *map)
 {
 	(void) strncpy(map->map_name, km->km_name, MDB_TGT_MAPSZ);
 	map->map_name[MDB_TGT_MAPSZ - 1] = '\0';
-	map->map_base = km->km_text_va;
-	map->map_size = km->km_text_size;
+	map->map_base = km->km_va;
+	map->map_size = km->km_size;
 	map->map_flags = MDB_TGT_MAP_R | MDB_TGT_MAP_W | MDB_TGT_MAP_X;
 
 	return (map);
@@ -1180,9 +1143,7 @@ kt_addr_to_map(mdb_tgt_t *t, uintptr_t addr)
 	kt_module_t *km;
 
 	for (km = mdb_list_next(&kt->k_modlist); km; km = mdb_list_next(km)) {
-		if (addr - km->km_text_va < km->km_text_size ||
-		    addr - km->km_data_va < km->km_data_size ||
-		    addr - km->km_bss_va < km->km_bss_size)
+		if (addr - km->km_va < km->km_size)
 			return (kt_module_to_map(km, &kt->k_map));
 	}
 
@@ -1225,41 +1186,15 @@ kt_load_ctfdata(mdb_tgt_t *t, kt_module_t *km)
 	if (km->km_ctfp != NULL)
 		return (km->km_ctfp);
 
-	if (km->km_ctf_va == 0) {
-		(void) set_errno(EMDB_NOCTF);
-		return (NULL);
-	}
-
 	if (km->km_symtab == NULL)
 		kt_load_module(t->t_data, t, km);
 
-	if ((km->km_ctf_buf = mdb_alloc(km->km_ctf_size, UM_NOSLEEP)) == NULL) {
-		warn("failed to allocate memory to load %s debugging "
-		    "information", km->km_name);
+	km->km_ctfp = mdb_ctf_open(km->km_pathname, &err);
+	if (km->km_ctfp == NULL) {
+		mdb_warn("failed to parse ctf data in %s: %s\n",
+		    km->km_pathname, ctf_errmsg(err));
 		return (NULL);
 	}
-
-	if (mdb_tgt_vread(t, km->km_ctf_buf, km->km_ctf_size,
-	    km->km_ctf_va) != km->km_ctf_size) {
-		warn("failed to read %lu bytes of debug data for %s at %p",
-		    (ulong_t)km->km_ctf_size, km->km_name,
-		    (void *)km->km_ctf_va);
-		mdb_free(km->km_ctf_buf, km->km_ctf_size);
-		km->km_ctf_buf = NULL;
-		return (NULL);
-	}
-
-	if ((km->km_ctfp = mdb_ctf_bufopen((const void *)km->km_ctf_buf,
-	    km->km_ctf_size, km->km_symbuf, &km->km_symtab_hdr,
-	    km->km_strtab, &km->km_strtab_hdr, &err)) == NULL) {
-		mdb_free(km->km_ctf_buf, km->km_ctf_size);
-		km->km_ctf_buf = NULL;
-		(void) set_errno(ctf_to_errno(err));
-		return (NULL);
-	}
-
-	mdb_dprintf(MDB_DBG_KMOD, "loaded %lu bytes of CTF data for %s\n",
-	    (ulong_t)km->km_ctf_size, km->km_name);
 
 	if (ctf_parent_name(km->km_ctfp) != NULL) {
 		mdb_var_t *v;
@@ -1296,9 +1231,7 @@ kt_addr_to_ctf(mdb_tgt_t *t, uintptr_t addr)
 	kt_module_t *km;
 
 	for (km = mdb_list_next(&kt->k_modlist); km; km = mdb_list_next(km)) {
-		if (addr - km->km_text_va < km->km_text_size ||
-		    addr - km->km_data_va < km->km_data_size ||
-		    addr - km->km_bss_va < km->km_bss_size)
+		if (addr - km->km_va < km->km_size)
 			return (kt_load_ctfdata(t, km));
 	}
 
@@ -1388,17 +1321,15 @@ kt_destroy(mdb_tgt_t *t)
 		if (km->km_symtab)
 			mdb_gelf_symtab_destroy(km->km_symtab);
 
-		if (km->km_data)
-			mdb_free(km->km_data, km->km_datasz);
-
 		if (km->km_ctfp)
 			ctf_close(km->km_ctfp);
 
-		if (km->km_ctf_buf != NULL)
-			mdb_free(km->km_ctf_buf, km->km_ctf_size);
+		if (km->km_file)
+			mdb_gelf_destroy(km->km_file);
 
 		nkm = mdb_list_next(km);
 		strfree(km->km_name);
+		strfree(km->km_pathname);
 		mdb_free(km, sizeof (kt_module_t));
 	}
 
