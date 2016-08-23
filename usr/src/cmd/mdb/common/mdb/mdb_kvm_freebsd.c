@@ -114,7 +114,13 @@ kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 	if (fio == NULL)
 		return;
 
-	km->km_file = mdb_gelf_create(fio, ET_EXEC, GF_FILE);
+	/*
+	 * Kernels are ET_EXEC.  Modules are ET_REL on platforms that
+	 * use link_elf_obj.c like amd64, but ET_DYN on platforms that
+	 * use link_elf.c like i386.  Easiest for now to not specify a
+	 * desired type.
+	 */
+	km->km_file = mdb_gelf_create(fio, ET_NONE, GF_FILE);
 	if (km->km_file == NULL) {
 		mdb_io_destroy(fio);
 		return;
@@ -1367,9 +1373,8 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 {
 	kt_data_t *kt = mdb_zalloc(sizeof (kt_data_t), UM_SLEEP);
 	int oflag = (t->t_flags & MDB_TGT_F_RDWR) ? O_RDWR : O_RDONLY;
-#if 0
-	struct utsname uts;
 	GElf_Sym sym;
+#if 0
 	pgcnt_t pmem;
 #endif
 	char errbuf[_POSIX2_LINE_MAX];
@@ -1408,8 +1413,6 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	kt->k_dynsym =
 	    mdb_gelf_symtab_create_file(kt->k_file, SHT_DYNSYM, MDB_TGT_DYNSYM);
 
-	/* XXX */
-	snprintf(kt->k_platform, sizeof(kt->k_platform), "amd64");
 #if 0
 	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "kas",
 	    &sym, NULL) == -1) {
@@ -1418,19 +1421,21 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	}
 
 	kt->k_as = (struct as *)(uintptr_t)sym.st_value;
+#endif
 
-	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "platform",
+	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "machine",
 	    &sym, NULL) == -1) {
-		warn("'platform' symbol is missing from kernel\n");
+		warn("'machine' symbol is missing from kernel\n");
 		goto err;
 	}
 
-	if (kt->k_kb_ops->kb_kread(kt->k_cookie, sym.st_value,
+	if (kvm_read(kt->k_cookie, sym.st_value,
 	    kt->k_platform, MAXNAMELEN) <= 0) {
-		warn("failed to read 'platform' string from kernel");
+		warn("failed to read 'machine' string from kernel");
 		goto err;
 	}
 
+#if 0
 	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "utsname",
 	    &sym, NULL) == -1) {
 		warn("'utsname' symbol is missing from kernel\n");
@@ -1454,8 +1459,8 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	if (mdb_gelf_symtab_lookup_by_name(kt->k_symtab, "ctf_arena", &sym,
 	    NULL) == 0 && !(mdb.m_flags & MDB_FL_NOCTF))
 		kt->k_ctfvalid = 1;
-
 #endif
+
 	(void) mdb_nv_create(&kt->k_modules, UM_SLEEP);
 	t->t_pshandle = kt->k_cookie;
 	t->t_data = kt;
