@@ -432,9 +432,14 @@ kt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-#if 1
 	kt_data_t *kt = mdb.m_target->t_data;
+	struct utsname uts;
 
+	bzero(&uts, sizeof (uts));
+	(void) strcpy(uts.nodename, "unknown machine");
+	(void) kt_uname(mdb.m_target, &uts);
+
+#if 1
 	if (mdb_prop_postmortem) {
 		mdb_printf("debugging crash dump %s (%d-bit)\n",
 		    kt->k_kvmfile, (int)(sizeof (void *) * NBBY));
@@ -443,13 +448,6 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    kt->k_symfile, (int)(sizeof (void *) * NBBY));
 	}
 #else
-	kt_data_t *kt = mdb.m_target->t_data;
-	struct utsname uts;
-
-	bzero(&uts, sizeof (uts));
-	(void) strcpy(uts.nodename, "unknown machine");
-	(void) kt_uname(mdb.m_target, &uts);
-
 	if (mdb_prop_postmortem) {
 		mdb_printf("debugging %scrash dump %s (%d-bit) from %s\n",
 		    kt->k_xpv_domu ? "domain " : "", kt->k_kvmfile,
@@ -458,27 +456,14 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("debugging live kernel (%d-bit) on %s\n",
 		    (int)(sizeof (void *) * NBBY), uts.nodename);
 	}
+#endif
 
 	mdb_printf("operating system: %s %s (%s)\n",
 	    uts.release, uts.version, uts.machine);
 
-	if (kt->k_dumphdr) {
-		dumphdr_t *dh = kt->k_dumphdr;
-
-		mdb_printf("image uuid: %s\n", dh->dump_uuid[0] != '\0' ?
-		    dh->dump_uuid : "(not set)");
-		mdb_printf("panic message: %s\n", dh->dump_panicstring);
-
-		kt->k_dump_print_content(dh, kt->k_dumpcontent);
-	} else {
-		char uuid[37];
-
-		if (mdb_readsym(uuid, 37, "dump_osimage_uuid") == 37 &&
-		    uuid[36] == '\0') {
-			mdb_printf("image uuid: %s\n", uuid);
-		}
+	if (kt->k_panicstr) {
+		mdb_printf("panic message: %s\n", kt->k_panicstr);
 	}
-#endif
 
 	return (DCMD_OK);
 }
@@ -663,15 +648,44 @@ kt_platform(mdb_tgt_t *t)
 	return (kt->k_platform);
 }
 
+static int
+mdb_tgt_readsym_str(mdb_tgt_t *t, mdb_tgt_as_t as, void *buf, size_t nbytes,
+    const char *obj, const char *name)
+{
+	GElf_Sym sym;
+
+	if (mdb_tgt_lookup_by_name(t, obj, name, &sym, NULL) == 0)
+		return (mdb_tgt_readstr(t, as, buf, nbytes, sym.st_value));
+
+	return (-1);
+}
+
 int
 kt_uname(mdb_tgt_t *t, struct utsname *utsp)
 {
-#if 0
-	return (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, utsp,
-	    sizeof (struct utsname), MDB_TGT_OBJ_EXEC, "utsname"));
-#else
-	return mdb_tgt_notsup();
+
+	if (mdb_tgt_readsym_str(t, MDB_TGT_AS_VIRT, utsp->sysname,
+	    sizeof (utsp->sysname), MDB_TGT_OBJ_EXEC, "ostype") == -1)
+		return (-1);
+	/*
+	 * XXX: Punt on hostname for now.  Would need to read from
+	 * prison0.pr_hostname.
+	 */
+#ifdef notyet
+	if (mdb_tgt_readsym_str(t, MDB_TGT_AS_VIRT, utsp->nodename,
+	    sizeof (utsp->nodename), MDB_TGT_OBJ_EXEC, "prison0.pr_hostname") == -1)
+		return (-1);
 #endif
+	if (mdb_tgt_readsym_str(t, MDB_TGT_AS_VIRT, utsp->release,
+	    sizeof (utsp->release), MDB_TGT_OBJ_EXEC, "osrelease") == -1)
+		return (-1);
+	if (mdb_tgt_readsym_str(t, MDB_TGT_AS_VIRT, utsp->version,
+	    sizeof (utsp->version), MDB_TGT_OBJ_EXEC, "version") == -1)
+		return (-1);
+	if (mdb_tgt_readsym_str(t, MDB_TGT_AS_VIRT, utsp->machine,
+	    sizeof (utsp->machine), MDB_TGT_OBJ_EXEC, "machine") == -1)
+		return (-1);
+	return (sizeof(*utsp));
 }
 
 /*ARGSUSED*/
@@ -1308,10 +1322,8 @@ kt_destroy(mdb_tgt_t *t)
 	if (kt->k_dynsym != NULL)
 		mdb_gelf_symtab_destroy(kt->k_dynsym);
 
-#if 0
-	if (kt->k_dumphdr != NULL)
-		mdb_free(kt->k_dumphdr, sizeof (dumphdr_t));
-#endif
+	if (kt->k_panicstr != NULL)
+		strfree(kt->k_panicstr);
 
 	mdb_gelf_destroy(kt->k_file);
 
@@ -1361,6 +1373,9 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	pgcnt_t pmem;
 #endif
 	char errbuf[_POSIX2_LINE_MAX];
+	lwpid_t dumptid;
+	char panicstr[128];
+	uintptr_t addr;
 
 	if (argc == 2) {
 		kt->k_symfile = strdup(argv[0]);
@@ -1451,56 +1466,31 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 #error	"unknown ISA"
 #endif
 
-	/* XXX: Todo: dumppcb / dumptid for crash dumps. */
-#if 0
 	/*
-	 * We read our representative thread ID (address) from the kernel's
-	 * global panic_thread.  It will remain 0 if this is a live kernel.
+	 * Read dumptid and panicstr from the crash dump.
 	 */
-	(void) mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &kt->k_tid, sizeof (void *),
-	    MDB_TGT_OBJ_EXEC, "panic_thread");
-
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &dumptid, sizeof (dumptid),
+	    MDB_TGT_OBJ_EXEC, "dumptid") == sizeof (dumptid))
+		kt->k_tid = dumptid;
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &addr, sizeof (addr),
+	    MDB_TGT_OBJ_EXEC, "panicstr") == sizeof (addr) && addr != 0) {
+		if (mdb_tgt_readstr(t, MDB_TGT_AS_VIRT, panicstr,
+		    sizeof(panicstr), addr) > 0)
+			kt->k_panicstr = strdup(panicstr);
+	}
+	
+	/* XXX: Todo: dumppcb for crash dumps. */
+#if 0
 	if ((mdb.m_flags & MDB_FL_ADB) && mdb_tgt_readsym(t, MDB_TGT_AS_VIRT,
 	    &pmem, sizeof (pmem), MDB_TGT_OBJ_EXEC, "physmem") == sizeof (pmem))
 		mdb_printf("physmem %lx\n", (ulong_t)pmem);
-
-	/*
-	 * If this is not a live kernel or a hypervisor dump, read the dump
-	 * header.  We don't have to sanity-check the header, as the open would
-	 * not have succeeded otherwise.
-	 */
-	if (!kt->k_xpv_domu && strcmp(kt->k_symfile, "/dev/ksyms") != 0) {
-		mdb_io_t *vmcore;
-
-		kt->k_dumphdr = mdb_alloc(sizeof (dumphdr_t), UM_SLEEP);
-
-		if ((vmcore = mdb_fdio_create_path(NULL, kt->k_kvmfile,
-		    O_RDONLY, 0)) == NULL) {
-			mdb_warn("failed to open %s", kt->k_kvmfile);
-			goto err;
-		}
-
-		if (IOP_READ(vmcore, kt->k_dumphdr, sizeof (dumphdr_t)) !=
-		    sizeof (dumphdr_t)) {
-			mdb_warn("failed to read dump header");
-			mdb_io_destroy(vmcore);
-			goto err;
-		}
-
-		mdb_io_destroy(vmcore);
-
-		(void) mdb_tgt_xdata_insert(t, "dumphdr",
-		    "dump header structure", kt_xd_dumphdr);
-	}
 #endif
 
 	return (0);
 
 err:
-#if 0
-	if (kt->k_dumphdr != NULL)
-		mdb_free(kt->k_dumphdr, sizeof (dumphdr_t));
-#endif
+	if (kt->k_panicstr != NULL)
+		strfree(kt->k_panicstr);
 
 	if (kt->k_symtab != NULL)
 		mdb_gelf_symtab_destroy(kt->k_symtab);

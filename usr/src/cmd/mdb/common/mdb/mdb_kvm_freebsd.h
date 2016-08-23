@@ -112,6 +112,7 @@ typedef struct kt_data {
 	struct dumphdr *k_dumphdr;	/* Dump header for post-mortem */
 	pid_t k_dumpcontent;		/* The pid(s) (if any) in the dump */
 #endif
+	const char *k_panicstr;		/* Panic message from dump */
 	int k_activated;		/* Set if kt_activate called */
 #if 0
 	int k_ctfvalid;			/* Set if kernel has a CTF arena */
