@@ -578,18 +578,12 @@ kt_activate(mdb_tgt_t *t)
 		if (!(t->t_flags & MDB_TGT_F_NOLOAD)) {
 			kt_load_modules(kt, t);
 
-#if 0
+#ifdef notyet
 			/*
-			 * Determine where the CTF data for krtld is. If krtld
-			 * is rolled into unix, force load the MDB krtld
-			 * module.
+			 * FreeBSD's kernel always includes its runtime
+			 * linker, so force load the MDB krtld module.
 			 */
-			kt->k_rtld_name = "krtld";
-
-			if (kt_module_by_name(kt, "krtld") == NULL) {
-				(void) mdb_module_load("krtld", MDB_MOD_SILENT);
-				kt->k_rtld_name = "unix";
-			}
+			(void) mdb_module_load("krtld", MDB_MOD_SILENT);
 #endif
 		}
 
@@ -854,6 +848,7 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 
 	switch ((uintptr_t)obj) {
 	case (uintptr_t)MDB_TGT_OBJ_EXEC:
+	case (uintptr_t)MDB_TGT_OBJ_RTLD:
 		km = &kmod;
 		n = 1;
 		break;
@@ -862,12 +857,6 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 		km = &kmod;
 		n = mdb_nv_size(&kt->k_modules) + 1;
 		break;
-
-#if 0
-	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = kt->k_rtld_name;
-		/*FALLTHRU*/
-#endif
 
 	default:
 		if ((v = mdb_nv_lookup(&kt->k_modules, obj)) == NULL)
@@ -1029,6 +1018,7 @@ kt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 
 	switch ((uintptr_t)obj) {
 	case (uintptr_t)MDB_TGT_OBJ_EXEC:
+	case (uintptr_t)MDB_TGT_OBJ_RTLD:
 		if (which == MDB_TGT_SYMTAB)
 			symtab = kt->k_symtab;
 		else
@@ -1054,12 +1044,6 @@ kt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 				    km->km_name, cb, data);
 		}
 		break;
-
-#if 0
-	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = kt->k_rtld_name;
-		/*FALLTHRU*/
-#endif
 
 	default:
 		v = mdb_nv_lookup(&kt->k_modules, obj);
@@ -1182,13 +1166,8 @@ kt_name_to_map(mdb_tgt_t *t, const char *name)
 	 * If name is MDB_TGT_OBJ_EXEC, return the first module on the list,
 	 * which will be unix since we keep k_modlist in load order.
 	 */
-	if (name == MDB_TGT_OBJ_EXEC)
+	if (name == MDB_TGT_OBJ_EXEC || name == MDB_TGT_OBJ_RTLD)
 		return (kt_module_to_map(mdb_list_next(&kt->k_modlist), &m));
-
-#if 0
-	if (name == MDB_TGT_OBJ_RTLD)
-		name = kt->k_rtld_name;
-#endif
 
 	if ((km = kt_module_by_name(kt, name)) != NULL)
 		return (kt_module_to_map(km, &m));
@@ -1267,10 +1246,8 @@ kt_name_to_ctf(mdb_tgt_t *t, const char *name)
 
 	if (name == MDB_TGT_OBJ_EXEC)
 		name = KT_CTFPARENT;
-#if 0
 	else if (name == MDB_TGT_OBJ_RTLD)
-		name = kt->k_rtld_name;
-#endif
+		name = KT_CTFPARENT;
 
 	if ((km = kt_module_by_name(kt, name)) != NULL)
 		return (kt_load_ctfdata(t, km));
