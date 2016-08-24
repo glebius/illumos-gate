@@ -52,6 +52,7 @@ typedef struct kt_module {
 	mdb_gelf_file_t *km_file;	/* ELF file object */
 	
 	mdb_gelf_symtab_t *km_symtab;	/* Symbol table for module */
+	uintptr_t km_relbase;		/* Relocation base for symtab */
 	uintptr_t km_va;		/* Base kernel VA of module */
 	size_t km_size;			/* Size of module */
 #if 0
