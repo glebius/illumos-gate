@@ -131,30 +131,43 @@ kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 	 * addresses to be manually relocated when using the symbol
 	 * table from the module file.  We wouldn't need this if we
 	 * used the in-kernel symbol table from the linker.
+	 *
+	 * TODO: What about ET_DYN?
 	 */
-	if (strcmp(km->km_name, "kernel") != 0) {
+	if (km->km_file->gf_ehdr.e_type == ET_REL) {
 		/*
-		 * XXX: What we should be doing is establishing base
-		 * addresses for each section by starting with the
-		 * module's base address and assigning that to each
-		 * loaded section consecutively.  For now, just find
-		 * the offset of the lowest loaded section and
-		 * subtract that from the base VA.
+		 * Adjust the sh_offset of each section loaded by the
+		 * kernel linker to map the address layout used by
+		 * link_elf_obj.c.
 		 */
 		mdb_gelf_sect_t *gsp;
 		size_t i;
 		GElf_Shdr *shp;
+		uintptr_t mapbase;
+		int alignmask;
 
+		mapbase = km->km_va;
 		for (gsp = km->km_file->gf_sects, i = 0;
 		     i < km->km_file->gf_shnum; i++, gsp++) {
 			shp = &gsp->gs_shdr;
-			if (shp->sh_type != SHT_PROGBITS)
+			if (shp->sh_size == 0)
 				continue;
-			if (km->km_relbase == 0 ||
-			    km->km_relbase > shp->sh_offset)
-				km->km_relbase = shp->sh_offset;
+			switch (shp->sh_type) {
+			case SHT_PROGBITS:
+			case SHT_NOBITS:
+#ifdef __amd64__
+#ifdef SHT_X86_64_UNWIND
+			case SHT_X86_64_UNWIND:
+#endif
+#endif
+				alignmask = shp->sh_addralign - 1;
+				mapbase += alignmask;
+				mapbase &= ~alignmask;
+				shp->sh_offset = mapbase;
+				mapbase += shp->sh_size;
+				break;
+			}
 		}
-		km->km_relbase = km->km_va - km->km_relbase;
 	}
 
 	km->km_symtab =
@@ -874,7 +887,6 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 	 * To simplify the implementation, we create a fake module on the stack
 	 * which is "prepended" to k_modlist and whose symtab is kt->k_symtab.
 	 */
-	kmod.km_relbase = 0;
 	kmod.km_symtab = kt->k_symtab;
 	kmod.km_list.ml_next = mdb_list_next(&kt->k_modlist);
 
@@ -905,7 +917,6 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 		if (mdb_gelf_symtab_lookup_by_name(km->km_symtab, name,
 		    symp, &sip->sym_id) == 0) {
 			sip->sym_table = MDB_TGT_SYMTAB;
-			symp->st_value += km->km_relbase;
 			return (0);
 		}
 	}
@@ -932,14 +943,12 @@ kt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 	 * each of three special symbol tables, in order of precedence.
 	 */
 	km->km_va = 0;
-	km->km_relbase = 0;
 	km->km_symtab = mdb.m_prsym;
 
 	if (kt->k_symtab != NULL) {
 		km->km_list.ml_next = (mdb_list_t *)(km + 1);
 		km = mdb_list_next(km);
 		km->km_va = 0;
-		km->km_relbase = 0;
 		km->km_symtab = kt->k_symtab;
 	}
 
@@ -947,7 +956,6 @@ kt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 		km->km_list.ml_next = (mdb_list_t *)(km + 1);
 		km = mdb_list_next(km);
 		km->km_va = 0;
-		km->km_relbase = 0;
 		km->km_symtab = kt->k_dynsym;
 	}
 
@@ -966,17 +974,11 @@ kt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 		    addr < km->km_va + km->km_size)
 			kt_load_module(kt, t, km);
 
-		if (km->km_relbase != 0 &&
-		    (addr < km->km_va || addr > km->km_va + km->km_size))
-			continue;
-
-		if (mdb_gelf_symtab_lookup_by_addr(km->km_symtab,
-		    addr - km->km_relbase,
+		if (mdb_gelf_symtab_lookup_by_addr(km->km_symtab, addr,
 		    flags, buf, nbytes, symp, &sip->sym_id) != 0 ||
 		    symp->st_value == 0)
 			continue;
 
-		symp->st_value += km->km_relbase;
 		if (flags & MDB_TGT_SYM_EXACT) {
 			sym_km = km;
 			goto found;
