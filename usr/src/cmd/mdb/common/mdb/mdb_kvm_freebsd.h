@@ -106,6 +106,7 @@ typedef struct kt_data {
 	mdb_dcmd_f *k_dcmd_stackr;	/* Dcmd to print stack trace and regs */
 	mdb_dcmd_f *k_dcmd_cpustack;	/* Dcmd to print CPU stack trace */
 	mdb_dcmd_f *k_dcmd_cpuregs;	/* Dcmd to print CPU registers */
+	void (*k_load_pcb_regs)(mdb_tgt_t *, uintptr_t, mdb_tgt_gregset_t *);
 #if 0
 	GElf_Sym k_intr_sym;		/* Kernel locore cmnint symbol */
 	GElf_Sym k_trap_sym;		/* Kernel locore cmntrap symbol */

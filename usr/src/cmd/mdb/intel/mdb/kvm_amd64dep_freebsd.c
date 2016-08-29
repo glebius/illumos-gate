@@ -178,36 +178,27 @@ const mdb_tgt_ops_t kt_amd64_ops = {
 	(int (*)()) mdb_tgt_notsup		/* t_auxv */
 };
 
-void
-kt_pcb_to_kregs(struct pcb *pcb, mdb_tgt_gregset_t *gregs)
+static void
+kt_amd64_load_pcb_regs(mdb_tgt_t *t, uintptr_t addr, mdb_tgt_gregset_t *gregs)
 {
-	/* Not sure if there is a better way to handle registers that are unknown. */
-	gregs->kregs[KREG_RDI] = 0;
-	gregs->kregs[KREG_RSI] = 0;
-	gregs->kregs[KREG_RDX] = 0;
-	gregs->kregs[KREG_RCX] = 0;
-	gregs->kregs[KREG_R8] = 0;
-	gregs->kregs[KREG_R9] = 0;
-	gregs->kregs[KREG_RAX] = 0;
-	gregs->kregs[KREG_RBX] = pcb->pcb_rbx;
-	gregs->kregs[KREG_RBP] = pcb->pcb_rbp;
-	gregs->kregs[KREG_R10] = 0;
-	gregs->kregs[KREG_R11] = 0;
-	gregs->kregs[KREG_R12] = pcb->pcb_r12;
-	gregs->kregs[KREG_R13] = pcb->pcb_r13;
-	gregs->kregs[KREG_R14] = pcb->pcb_r14;
-	gregs->kregs[KREG_R15] = pcb->pcb_r15;
-	gregs->kregs[KREG_DS] = 0;
-	gregs->kregs[KREG_ES] = 0;
-	gregs->kregs[KREG_FS] = 0;
-	gregs->kregs[KREG_GS] = 0;
-	gregs->kregs[KREG_TRAPNO] = 0;
-	gregs->kregs[KREG_ERR] = 0;
-	gregs->kregs[KREG_RIP] = pcb->pcb_rip;
-	gregs->kregs[KREG_CS] = 0;
-	gregs->kregs[KREG_RFLAGS] = 0;
-	gregs->kregs[KREG_RSP] = pcb->pcb_rsp;
-	gregs->kregs[KREG_SS] = 0;
+	struct pcb pcb;
+
+	if (mdb_tgt_vread(t, &pcb, sizeof (pcb), addr) != sizeof (pcb))
+		return;
+
+	/*
+	 * Not sure if there is a better way to handle registers that
+	 * are unknown.
+	 */
+	memset(gregs, 0, sizeof (*gregs));
+	gregs->kregs[KREG_RBX] = pcb.pcb_rbx;
+	gregs->kregs[KREG_RBP] = pcb.pcb_rbp;
+	gregs->kregs[KREG_R12] = pcb.pcb_r12;
+	gregs->kregs[KREG_R13] = pcb.pcb_r13;
+	gregs->kregs[KREG_R14] = pcb.pcb_r14;
+	gregs->kregs[KREG_R15] = pcb.pcb_r15;
+	gregs->kregs[KREG_RIP] = pcb.pcb_rip;
+	gregs->kregs[KREG_RSP] = pcb.pcb_rsp;
 }
 
 void
@@ -237,6 +228,7 @@ kt_amd64_init(mdb_tgt_t *t)
 	kt->k_dcmd_cpustack = kt_cpustack;
 	kt->k_dcmd_cpuregs = kt_cpuregs;
 #endif
+	kt->k_load_pcb_regs = kt_amd64_load_pcb_regs;
 
 	t->t_ops = &kt_amd64_ops;
 

@@ -1507,8 +1507,14 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 		    sizeof(panicstr), addr) > 0)
 			kt->k_panicstr = strdup(panicstr);
 	}
-	
-	/* XXX: Todo: dumppcb for crash dumps. */
+
+	/*
+	 * Pull initial register values from crash dump.
+	 */
+	if (kt->k_tid != 0 && mdb_gelf_symtab_lookup_by_name(kt->k_symtab,
+	    "dumppcb", &sym, NULL) == 0)
+		kt->k_load_pcb_regs(t, sym.st_value, kt->k_regs);
+
 #if 0
 	if ((mdb.m_flags & MDB_FL_ADB) && mdb_tgt_readsym(t, MDB_TGT_AS_VIRT,
 	    &pmem, sizeof (pmem), MDB_TGT_OBJ_EXEC, "physmem") == sizeof (pmem))
