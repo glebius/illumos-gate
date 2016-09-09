@@ -183,9 +183,10 @@ CFLAGS+= -DENODATA=ENOENT
 
 .include <bsd.prog.mk>
 
-CWARNFLAGS+= \
+CWARNFLAGS.clang+= \
 	-Wno-bitwise-op-parentheses \
 	-Wno-cast-align \
+	-Wno-cast-qual \
 	-Wno-char-subscripts \
 	-Wno-incompatible-pointer-types \
 	-Wno-incompatible-pointer-types-discards-qualifiers \
@@ -195,4 +196,5 @@ CWARNFLAGS+= \
 	-Wno-missing-variable-declarations \
 	-Wno-shadow \
 	-Wno-sign-compare \
+	-Wno-error-tautological-pointer-compare \
 	-Wno-unused-parameter
