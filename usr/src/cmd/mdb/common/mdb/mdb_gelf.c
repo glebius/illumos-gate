@@ -1472,7 +1472,7 @@ gelf64_nocopy(const Elf64_Sym *src, GElf_Sym *dst)
 static const void *
 gelf32_sym_search(const Elf32_Sym **asmap, size_t aslen, uintptr_t addr)
 {
-	ulong_t i, mid, lo = 0, hi = aslen - 1;
+	ulong_t i, mid, lo = 0, hi = aslen - 1, lasti;
 	const Elf32_Sym *symp;
 	Elf32_Addr v;
 	size_t size;
@@ -1490,22 +1490,40 @@ gelf32_sym_search(const Elf32_Sym **asmap, size_t aslen, uintptr_t addr)
 
 	i = addr < asmap[hi]->st_value ? lo : hi;
 	symp = asmap[i];
+	lasti = i;
 	v = symp->st_value;
 
 	/*
 	 * If the previous entry has the same value, improve our choice.  The
 	 * order of equal-valued symbols is determined by gelf32_sym_compare().
 	 */
-	while (i-- != 0 && asmap[i]->st_value == v)
+	while (i-- != 0 && asmap[i]->st_value == v) {
 		symp = asmap[i];
+		lasti = i;
+	}
 
 	/*
 	 * If an absolute symbol distance was specified, use that; otherwise
 	 * use the ELF symbol size, or 1 byte if the ELF size is zero.
 	 */
-	if (mdb.m_symdist == 0)
+	if (mdb.m_symdist == 0) {
 		size = MAX(symp->st_size, 1);
-	else
+
+		/*
+		 * If this symbol has a size of 0 and is a function,
+		 * find the next symbol and use the delta between the
+		 * two values as the size instead of '1'.
+		 */
+		if (symp->st_size == 0 &&
+		    ELF32_ST_TYPE(symp->st_info) == STT_FUNC) {
+			for (i = lasti + 1; i < aslen; i++) {
+				if (asmap[i]->st_value == symp->st_value)
+					continue;
+				size = asmap[i]->st_value - symp->st_value;
+				break;
+			}
+		}
+	} else
 		size = mdb.m_symdist;
 
 	if (addr - symp->st_value < size)
@@ -1517,7 +1535,7 @@ gelf32_sym_search(const Elf32_Sym **asmap, size_t aslen, uintptr_t addr)
 static const void *
 gelf64_sym_search(const Elf64_Sym **asmap, size_t aslen, uintptr_t addr)
 {
-	ulong_t i, mid, lo = 0, hi = aslen - 1;
+	ulong_t i, mid, lo = 0, hi = aslen - 1, lasti;
 	const Elf64_Sym *symp;
 	Elf64_Addr v;
 	size_t size;
@@ -1535,22 +1553,40 @@ gelf64_sym_search(const Elf64_Sym **asmap, size_t aslen, uintptr_t addr)
 
 	i = addr < asmap[hi]->st_value ? lo : hi;
 	symp = asmap[i];
+	lasti = i;
 	v = symp->st_value;
 
 	/*
 	 * If the previous entry has the same value, improve our choice.  The
 	 * order of equal-valued symbols is determined by gelf64_sym_compare().
 	 */
-	while (i-- != 0 && asmap[i]->st_value == v)
+	while (i-- != 0 && asmap[i]->st_value == v) {
 		symp = asmap[i];
+		lasti = i;
+	}
 
 	/*
 	 * If an absolute symbol distance was specified, use that; otherwise
 	 * use the ELF symbol size, or 1 byte if the ELF size is zero.
 	 */
-	if (mdb.m_symdist == 0)
+	if (mdb.m_symdist == 0) {
 		size = MAX(symp->st_size, 1);
-	else
+
+		/*
+		 * If this symbol has a size of 0 and is a function,
+		 * find the next symbol and use the delta between the
+		 * two values as the size instead of '1'.
+		 */
+		if (symp->st_size == 0 &&
+		    ELF64_ST_TYPE(symp->st_info) == STT_FUNC) {
+			for (i = lasti + 1; i < aslen; i++) {
+				if (asmap[i]->st_value == symp->st_value)
+					continue;
+				size = asmap[i]->st_value - symp->st_value;
+				break;
+			}
+		}
+	} else
 		size = mdb.m_symdist;
 
 	if (addr - symp->st_value < size)
