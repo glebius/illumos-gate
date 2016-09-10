@@ -844,8 +844,18 @@ iob_addr2str(uintptr_t addr)
 	GElf_Sym sym;
 
 	if (mdb_tgt_lookup_by_addr(mdb.m_target, addr,
-	    MDB_TGT_SYM_FUZZY, buf, sizeof (buf), &sym, NULL) == -1)
-		return (NULL);
+	    MDB_TGT_SYM_FUZZY, buf, sizeof (buf), &sym, NULL) == -1) {
+		/*
+		 * A tail call may report a PC on the stack that is just
+		 * after the end of a function.  If we didn't get a match,
+		 * check to see if addr - 1 matches a symbol.  If it does
+		 * and if it is a function symbol, use that symbol.
+		 */
+		if (mdb_tgt_lookup_by_addr(mdb.m_target, addr - 1,
+		    MDB_TGT_SYM_FUZZY, buf, sizeof (buf), &sym, NULL) == -1 ||
+		    GELF_ST_TYPE(sym.st_info) != STT_FUNC)
+			return (NULL);
+	}
 
 	if (mdb.m_demangler != NULL && (mdb.m_flags & MDB_FL_DEMANGLE))
 		name = (char *)mdb_dem_convert(mdb.m_demangler, buf);
