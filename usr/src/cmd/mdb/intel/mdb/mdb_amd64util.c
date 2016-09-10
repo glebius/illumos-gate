@@ -30,7 +30,9 @@
  */
 
 #include <sys/types.h>
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
+#include <machine/frame.h>
+#else
 #include <sys/reg.h>
 #include <sys/privregs.h>
 #endif
@@ -240,6 +242,8 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	if ((mdb_readsym(&xp, sizeof (xp), "xpv_panicking") != -1) && (xp > 0))
 		xpv_panic = 1;
 #endif
+#else
+	char funcname[MDB_TGT_SYM_NAMLEN];
 #endif
 
 	bcopy(gsp, &gregs, sizeof (gregs));
@@ -384,7 +388,67 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			break;
 
 #ifdef __FreeBSD__
-		/* TODO: trapframes */
+		if ((mdb_tgt_lookup_by_addr(t, pc, MDB_TGT_SYM_FUZZY,
+		    funcname, sizeof(funcname), &s, NULL) == 0) &&
+		    (strcmp(funcname, "calltrap") == 0 ||
+		    strcmp(funcname, "fork_trampoline") == 0 ||
+		    strcmp(funcname, "nmi_calltrap") == 0 ||
+		    strcmp(funcname, "Xdblfault") == 0 ||
+		    strncmp(funcname, "Xatpic_intr", 11) == 0 ||
+		    strncmp(funcname, "Xapic_isr", 9) == 0 ||
+		    strcmp(funcname, "Xtimerint") == 0 ||
+		    strcmp(funcname, "Xipi_intr_bitmap_handler") == 0 ||
+		    strcmp(funcname, "Xcpustop") == 0 ||
+		    strcmp(funcname, "Xcpususpend") == 0 ||
+		    strcmp(funcname, "Xrendezvous") == 0 ||
+		    strcmp(funcname, "Xfast_syscall") == 0 ||
+		    strcmp(funcname, "Xint0x80_syscall") == 0 ||
+		    strcmp(funcname, "Xtimerint") == 0 ||
+		    strcmp(funcname, "Xcpustop") == 0 ||
+		    strcmp(funcname, "Xcpususpend") == 0 ||
+		    strcmp(funcname, "Xrendezvous") == 0 ||
+		    strcmp(funcname, "Xipi_intr_bitmap_handler") == 0)) {
+			struct trapframe tf;
+
+			if (mdb_tgt_vread(t, &tf, sizeof (tf), lastfp + 16) !=
+			    sizeof (tf)) {
+				err = EMDB_NOMAP;
+				goto badfp;
+			}
+
+			kregs[KREG_RDI] = tf.tf_rdi;
+			kregs[KREG_RSI] = tf.tf_rsi;
+			kregs[KREG_RDX] = tf.tf_rdx;
+			kregs[KREG_RCX] = tf.tf_rcx;
+			kregs[KREG_R8] = tf.tf_r8;
+			kregs[KREG_R9] = tf.tf_r9;
+			kregs[KREG_RAX] = tf.tf_rax;
+			kregs[KREG_RBX] = tf.tf_rbx;
+			kregs[KREG_RBP] = tf.tf_rbp;
+			kregs[KREG_R10] = tf.tf_r10;
+			kregs[KREG_R11] = tf.tf_r11;
+			kregs[KREG_R12] = tf.tf_r12;
+			kregs[KREG_R13] = tf.tf_r13;
+			kregs[KREG_R14] = tf.tf_r14;
+			kregs[KREG_R15] = tf.tf_r15;
+			kregs[KREG_TRAPNO] = tf.tf_trapno;
+			kregs[KREG_FS] = tf.tf_fs;
+			kregs[KREG_GS] = tf.tf_gs;
+			kregs[KREG_ES] = tf.tf_es;
+			kregs[KREG_DS] = tf.tf_ds;
+			kregs[KREG_ERR] = tf.tf_err;
+			kregs[KREG_RIP] = tf.tf_rip;
+			kregs[KREG_CS] = tf.tf_cs;
+			kregs[KREG_RFLAGS] = tf.tf_rflags;
+			kregs[KREG_RSP] = tf.tf_rsp;
+			kregs[KREG_SS] = tf.tf_ss;
+
+			lastfp = fp;
+			fp = tf.tf_rbp;
+			pc = tf.tf_rip;
+			got_pc = 1;
+			continue;
+		}
 #endif
 
 		kregs[KREG_RSP] = kregs[KREG_RBP];
