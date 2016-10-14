@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-SUBDIR=	mdb \
-	modules
+SUBDIR=	mdb_ks \
+	krtld
 
 .include <bsd.subdir.mk>
