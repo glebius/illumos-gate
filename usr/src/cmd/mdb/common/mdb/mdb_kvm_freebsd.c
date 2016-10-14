@@ -100,9 +100,9 @@ typedef struct kt_maparg {
 	mdb_tgt_map_f *map_cb;		/* Caller's callback function */
 	void *map_data;			/* Callback function argument */
 } kt_maparg_t;
+#endif
 
 static const char KT_MODULE[] = "mdb_ks";
-#endif
 static const char KT_CTFPARENT[] = "kernel";
 
 static void
@@ -592,12 +592,14 @@ kt_activate(mdb_tgt_t *t)
 			    "macros may not match kernel implementation\n",
 			    u2.sysname, u2.release, u2.version);
 		}
+#endif
 
 		if (mdb_module_load(KT_MODULE, MDB_MOD_GLOBAL) < 0) {
 			warn("failed to load kernel support module -- "
 			    "some modules may not load\n");
 		}
 
+#if 0
 		if (mdb_prop_postmortem && kt->k_dumphdr != NULL) {
 			sym = dlsym(RTLD_NEXT, "mdb_dump_print_content");
 			if (sym != NULL)
@@ -1339,9 +1341,7 @@ kt_destroy(mdb_tgt_t *t)
 	kt_data_t *kt = t->t_data;
 	kt_module_t *km, *nkm;
 
-#if 0
 	(void) mdb_module_unload(KT_MODULE, 0);
-#endif
 
 	if (kt->k_regs != NULL)
 		mdb_free(kt->k_regs, kt->k_regsize);
