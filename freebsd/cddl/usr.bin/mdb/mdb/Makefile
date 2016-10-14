@@ -1,16 +1,18 @@
 # $FreeBSD$
 
-MDB_DIR=	${.CURDIR}/../../../../../usr/src/cmd/mdb
-LIBDISASM_DIR=	${.CURDIR}/../../../../../usr/src/lib/libdisasm
-LIBSAVEARGS_DIR=${.CURDIR}/../../../../../usr/src/lib/libsaveargs
-DIS_DIR=	${.CURDIR}/../../../../../usr/src/common/dis
+LOCAL_CDDL=	${.CURDIR}/../../../..
+CDDL_TOP=	${.CURDIR}/../../../../..
+MDB_DIR=	${CDDL_TOP}/usr/src/cmd/mdb
+LIBDISASM_DIR=	${CDDL_TOP}/usr/src/lib/libdisasm
+LIBSAVEARGS_DIR=${CDDL_TOP}/usr/src/lib/libsaveargs
+DIS_DIR=	${CDDL_TOP}/usr/src/common/dis
 
 PROG=	mdb
 MAN=
 
-CFLAGS+= -I${.CURDIR}/../../../../sys/cddl/compat/opensolaris \
+CFLAGS+= -I${LOCAL_CDDL}/sys/cddl/compat/opensolaris \
 	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
-	-I${.CURDIR}/../../../../cddl/compat/opensolaris/include \
+	-I${LOCAL_CDDL}/cddl/compat/opensolaris/include \
 	-I${FREEBSD_SRC_DIR}/cddl/compat/opensolaris/include \
 	-I${OPENSOLARIS_USR_DISTDIR}/head \
 	-I${LIBDISASM_DIR}/common \
@@ -139,7 +141,7 @@ LDADD= -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -lelf -lutil -lz
 SRCS+=	mdb_lex.l \
 	mdb_grammar.y
 
-.PATH: ${.CURDIR}/../../../../cddl/compat/opensolaris/misc
+.PATH: ${LOCAL_CDDL}/cddl/compat/opensolaris/misc
 
 SRCS+=	\
 	fdwalk.c \
@@ -180,6 +182,8 @@ CFLAGS+= -DIUCLC=0
 
 # Use ENOENT for ENODATA.
 CFLAGS+= -DENODATA=ENOENT
+
+LDFLAGS+= -Wl,--export-dynamic
 
 .include <bsd.prog.mk>
 
