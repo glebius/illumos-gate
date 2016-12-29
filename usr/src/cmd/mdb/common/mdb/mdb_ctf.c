@@ -1654,7 +1654,7 @@ mdb_ctf_vread(void *modbuf, const char *target_typename,
  */
 int
 mdb_ctf_convert(void *modbuf, const char *target_typename,
-    const char *mdb_typename, void *tgtbuf, uint_t flags)
+    const char *mdb_typename, const void *tgtbuf, uint_t flags)
 {
 	ctf_file_t *mfp;
 	ctf_id_t mid;

@@ -146,7 +146,7 @@ extern ssize_t mdb_ctf_offset_to_name(mdb_ctf_id_t, ulong_t, char *, size_t,
 extern int mdb_ctf_vread(void *, const char *, const char *,
     uintptr_t, uint_t);
 extern int mdb_ctf_convert(void *, const char *, const char *,
-    void *, uint_t);
+    const void *, uint_t);
 extern int mdb_ctf_readsym(void *, const char *, const char *, uint_t);
 
 #ifdef _MDB
