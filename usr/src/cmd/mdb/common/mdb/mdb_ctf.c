@@ -1649,6 +1649,45 @@ mdb_ctf_vread(void *modbuf, const char *target_typename,
 }
 
 /*
+ * Like mdb_ctf_vread() but accepts a buffer holding the structure instead
+ * of reading it in via mdb_vread().
+ */
+int
+mdb_ctf_convert(void *modbuf, const char *target_typename,
+    const char *mdb_typename, void *tgtbuf, uint_t flags)
+{
+	ctf_file_t *mfp;
+	ctf_id_t mid;
+	mdb_ctf_id_t tgtid;
+	mdb_ctf_id_t modid;
+	mdb_module_t *mod;
+
+	if ((mod = mdb_get_module()) == NULL || (mfp = mod->mod_ctfp) == NULL) {
+		mdb_ctf_warn(flags, "no ctf data found for mdb module %s\n",
+		    mod->mod_name);
+		return (set_errno(EMDB_NOCTF));
+	}
+
+	if ((mid = ctf_lookup_by_name(mfp, mdb_typename)) == CTF_ERR) {
+		mdb_ctf_warn(flags, "couldn't find ctf data for "
+		    "type %s in mdb module %s\n",
+		    mdb_typename, mod->mod_name);
+		return (set_errno(ctf_to_errno(ctf_errno(mfp))));
+	}
+
+	set_ctf_id(&modid, mfp, mid);
+
+	if (mdb_ctf_lookup_by_name(target_typename, &tgtid) != 0) {
+		mdb_ctf_warn(flags,
+		    "couldn't find type %s in target's ctf data\n",
+		    target_typename);
+		return (set_errno(EMDB_NOCTF));
+	}
+
+	return (vread_helper(modid, modbuf, tgtid, tgtbuf, NULL, flags));
+}
+
+/*
  * Note: mdb_ctf_readsym() doesn't take separate parameters for the name
  * of the target's type vs the mdb module's type.  Use with complicated
  * types (e.g. structs) may result in unnecessary failure if a member of
