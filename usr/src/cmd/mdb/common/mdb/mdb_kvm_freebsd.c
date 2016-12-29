@@ -624,13 +624,11 @@ kt_activate(mdb_tgt_t *t)
 		if (!(t->t_flags & MDB_TGT_F_NOLOAD)) {
 			kt_load_modules(kt, t);
 
-#ifdef notyet
 			/*
 			 * FreeBSD's kernel always includes its runtime
-			 * linker, so force load the MDB krtld module.
+			 * linker, so force load the MDB kld module.
 			 */
-			(void) mdb_module_load("krtld", MDB_MOD_SILENT);
-#endif
+			(void) mdb_module_load("kld", MDB_MOD_SILENT);
 		}
 
 

@@ -1,6 +1,6 @@
 # $FreeBSD$
 
 SUBDIR=	mdb_ks \
-	krtld
+	kld
 
 .include <bsd.subdir.mk>
