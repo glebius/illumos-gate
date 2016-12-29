@@ -123,26 +123,58 @@ lf_walk_fini(mdb_walk_state_t *wsp)
 	    linker_file_t_size);
 }
 
-#if 0
+static int
+kldstat_format(uintptr_t addr, const void *data, void *private)
+{
+	char name[MAXPATHLEN];
+	mdb_linker_file_t lf;
+	
+	if (mdb_ctf_convert(&lf, "struct linker_file", "mdb_linker_file_t",
+	    data, 0) == -1) {
+		mdb_warn("failed to parse linker_file_t at %#lr",
+		    addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)lf.filename) == -1)
+		strcpy(name, "???");
+
+	mdb_printf("%2d %4d 0x%?p %-8lx %s\n", lf.id, lf.refs, lf.address,
+	    (unsigned long)lf.size, name);
+
+	return (WALK_NEXT);
+}
+
 static int
 kldstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uintptr_t addr;
 	uint_t verbose = 0;
 
 	mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, 1, &verbose,
 	    NULL);
 
-	if (mdb_vread(&addr, sizeof (addr), linker_files_addr) == -1) {
-		mdb_warn("failed to read linker_file_t");
+	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
+		mdb_printf("%<u>%2s %4s %-?s   %-8s %s%</u>\n",
+		    "Id", "Refs", "Address", "Size", "Name");
 	}
+
+	if (flags & DCMD_ADDRSPEC) {
+		uint8_t lf[linker_file_t_size];
+
+		(void) mdb_vread(lf, linker_file_t_size, addr);
+		return (kldstat_format(addr, lf, &verbose));
+	}
+
+	if (mdb_walk("linker_files", kldstat_format, &verbose) == -1)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
 }
-#endif
 
 static const mdb_dcmd_t dcmds[] = {
-#if 0
 	{ "kldstat", "?[-v]", "list kernel modules", kldstat },
+#if 0
 	{ "modctl", NULL, "list modctl structures", modctls },
 	{ "modhdrs", ":", "given modctl, dump module ehdr and shdrs", modhdrs },
 	{ "modinfo", NULL, "list module information", modinfo },
