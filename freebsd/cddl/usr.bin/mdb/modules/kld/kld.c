@@ -126,9 +126,11 @@ lf_walk_fini(mdb_walk_state_t *wsp)
 static int
 kldstat_format(uintptr_t addr, const void *data, void *private)
 {
-	char name[MAXPATHLEN];
+	char name[MAXPATHLEN], pathname[MAXPATHLEN];
+	int *verbosep;
 	mdb_linker_file_t lf;
-	
+
+	verbosep = private;
 	if (mdb_ctf_convert(&lf, "struct linker_file", "mdb_linker_file_t",
 	    data, 0) == -1) {
 		mdb_warn("failed to parse linker_file_t at %#lr",
@@ -138,9 +140,15 @@ kldstat_format(uintptr_t addr, const void *data, void *private)
 
 	if (mdb_readstr(name, sizeof (name), (uintptr_t)lf.filename) == -1)
 		strcpy(name, "???");
+	if (*verbosep == 0 || mdb_readstr(pathname, sizeof (pathname),
+	    (uintptr_t)lf.pathname) == -1)
+		strcpy(pathname, "???");
 
-	mdb_printf("%2d %4d 0x%?p %-8lx %s\n", lf.id, lf.refs, lf.address,
+	mdb_printf("%2d %4d 0x%?p %-8lx %s", lf.id, lf.refs, lf.address,
 	    (unsigned long)lf.size, name);
+	if (*verbosep)
+		mdb_printf(" (%s)", pathname);
+	mdb_printf("\n");
 
 	return (WALK_NEXT);
 }
