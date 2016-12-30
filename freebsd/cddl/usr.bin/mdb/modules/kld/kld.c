@@ -31,6 +31,7 @@
 
 static uintptr_t linker_files_addr;
 static size_t linker_file_t_size;
+static size_t module_t_size;
 
 typedef struct {
 	int	refs;
@@ -43,14 +44,13 @@ typedef struct {
 	TAILQ_HEAD(, module) modules;
 } mdb_linker_file_t;
 
-#if 0
 typedef struct {
+	TAILQ_ENTRY(module) link;
 	TAILQ_ENTRY(module) flink;
 	int	refs;
 	int	id;
 	char	*name;
 } mdb_module_t;
-#endif
 
 struct lf_walk_data {
 	uintptr_t lfd_head;
@@ -124,6 +124,66 @@ lf_walk_fini(mdb_walk_state_t *wsp)
 }
 
 static int
+lfmod_walk_init(mdb_walk_state_t *wsp)
+{
+	mdb_linker_file_t lf;
+
+	/*
+	 * This walker requires the address of a linker_file as the
+	 * starting address.
+	 */
+	if (wsp->walk_addr == 0)
+		return (WALK_ERR);
+
+	/* Fetch the start of the list from the linker file. */
+	if (mdb_ctf_vread(&lf, "struct linker_file", "mdb_linker_file_t",
+	    wsp->walk_addr, 0) == -1) {
+		mdb_warn("failed to read linker_file at %#lr", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)TAILQ_FIRST(&lf.modules);
+
+	return (WALK_NEXT);
+}
+
+static int
+lfmod_walk_step(mdb_walk_state_t *wsp)
+{
+	uint8_t tgtmod[module_t_size];
+	mdb_module_t mod;
+	int	status;
+
+	if (wsp->walk_addr == 0)
+		return (WALK_DONE);
+
+	if (mdb_vread(tgtmod, module_t_size,
+	    wsp->walk_addr) == -1) {
+		mdb_warn("failed to read module_t at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_ctf_convert(&mod, "struct module", "mdb_module_t", tgtmod,
+	    0) == -1) {
+		mdb_warn("failed to parse module_t at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, tgtmod, wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)TAILQ_NEXT(&mod, flink);
+
+	return (status);
+}
+
+static void
+lfmod_walk_fini(mdb_walk_state_t *wsp)
+{
+}
+
+static int
 kldstat_format(uintptr_t addr, const void *data, void *private)
 {
 	char name[MAXPATHLEN], pathname[MAXPATHLEN];
@@ -194,6 +254,8 @@ static const mdb_dcmd_t dcmds[] = {
 static const mdb_walker_t walkers[] = {
 	{ "linker_files", "list of linker_file_t structures",
 		lf_walk_init, lf_walk_step, lf_walk_fini },
+	{ "lf_modules", "list of module_t structures from a linker_file_t",
+		lfmod_walk_init, lfmod_walk_step, lfmod_walk_fini },
 	{ NULL }
 };
 
@@ -225,6 +287,19 @@ _mdb_init(void)
 	}
 
 	linker_file_t_size = size;
+
+	if (mdb_ctf_lookup_by_name("struct module", &id) != 0) {
+		mdb_warn("failed to lookup type 'struct module'");
+		return (NULL);
+	}
+
+	size = mdb_ctf_type_size(id);
+	if (size <= 0) {
+		mdb_warn("failed to lookup sizeof of 'struct module'");
+		return (NULL);
+	}
+
+	module_t_size = size;
 
 	return (&kld_modinfo);
 }
