@@ -54,14 +54,13 @@ typedef struct {
 
 struct lf_walk_data {
 	uintptr_t lfd_head;
-	uint8_t lfd_lf[0];
 };
 
 static int
 lf_walk_init(mdb_walk_state_t *wsp)
 {
 	struct lf_walk_data *lfd = mdb_alloc(
-	    sizeof (struct lf_walk_data) + linker_file_t_size, UM_SLEEP);
+	    sizeof (struct lf_walk_data), UM_SLEEP);
 
 	lfd->lfd_head = (wsp->walk_addr == 0 ? linker_files_addr : wsp->walk_addr);
 	wsp->walk_data = lfd;
@@ -74,6 +73,7 @@ static int
 lf_walk_step(mdb_walk_state_t *wsp)
 {
 	struct lf_walk_data *lfd = wsp->walk_data;
+	uint8_t tgtlf[module_t_size];
 	mdb_linker_file_t lf;
 	int	status;
 
@@ -94,22 +94,20 @@ lf_walk_step(mdb_walk_state_t *wsp)
 		}
 	}
 
-	if (mdb_vread(lfd->lfd_lf, linker_file_t_size,
-	    wsp->walk_addr) == -1) {
+	if (mdb_vread(tgtlf, sizeof (tgtlf), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read linker_file_t at %#lr",
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
 	if (mdb_ctf_convert(&lf, "struct linker_file", "mdb_linker_file_t",
-	    lfd->lfd_lf, 0) == -1) {
+	    tgtlf, 0) == -1) {
 		mdb_warn("failed to parse linker_file_t at %#lr",
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
 	
-	status = wsp->walk_callback(wsp->walk_addr, lfd->lfd_lf,
-	    wsp->walk_cbdata);
+	status = wsp->walk_callback(wsp->walk_addr, tgtlf, wsp->walk_cbdata);
 
 	wsp->walk_addr = (uintptr_t)TAILQ_NEXT(&lf, link);
 
@@ -119,8 +117,7 @@ lf_walk_step(mdb_walk_state_t *wsp)
 static void
 lf_walk_fini(mdb_walk_state_t *wsp)
 {
-	mdb_free(wsp->walk_data, sizeof (struct lf_walk_data) +
-	    linker_file_t_size);
+	mdb_free(wsp->walk_data, sizeof (struct lf_walk_data));
 }
 
 static int
@@ -157,8 +154,7 @@ lfmod_walk_step(mdb_walk_state_t *wsp)
 	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
-	if (mdb_vread(tgtmod, module_t_size,
-	    wsp->walk_addr) == -1) {
+	if (mdb_vread(tgtmod, sizeof (tgtmod), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read module_t at %#lr",
 		    wsp->walk_addr);
 		return (WALK_ERR);
@@ -254,7 +250,7 @@ kldstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (flags & DCMD_ADDRSPEC) {
 		uint8_t lf[linker_file_t_size];
 
-		(void) mdb_vread(lf, linker_file_t_size, addr);
+		(void) mdb_vread(lf, sizeof (lf), addr);
 		return (kldstat_format(addr, lf, &verbose));
 	}
 
@@ -306,7 +302,7 @@ _mdb_init(void)
 
 	size = mdb_ctf_type_size(id);
 	if (size <= 0) {
-		mdb_warn("failed to lookup sizeof of 'struct linker_file'");
+		mdb_warn("failed to lookup size of 'struct linker_file'");
 		return (NULL);
 	}
 
