@@ -26,12 +26,12 @@
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_ks.h>
 
 #include <sys/queue.h>
 
-static uintptr_t linker_files_addr;
-static size_t linker_file_t_size;
-static size_t module_t_size;
+static ssize_t struct_linker_file_size;
+static ssize_t struct_module_size;
 
 typedef struct {
 	int	refs;
@@ -52,19 +52,21 @@ typedef struct {
 	char	*name;
 } mdb_module_t;
 
-struct lf_walk_data {
-	uintptr_t lfd_head;
-};
-
 static int
 lf_walk_init(mdb_walk_state_t *wsp)
 {
-	struct lf_walk_data *lfd = mdb_alloc(
-	    sizeof (struct lf_walk_data), UM_SLEEP);
 
-	lfd->lfd_head = (wsp->walk_addr == 0 ? linker_files_addr : wsp->walk_addr);
-	wsp->walk_data = lfd;
-	wsp->walk_addr = 0;
+	if (struct_linker_file_size == 0)
+		struct_linker_file_size = mdb_type_size("struct linker_file");
+	if (struct_linker_file_size == -1) {
+		mdb_warn("failed to lookup size of 'struct linker_file'");
+		return (WALK_ERR);
+	}
+	if (wsp->walk_addr == 0) {
+		wsp->walk_addr = mdb_tailq_first("linker_files");
+		if (wsp->walk_addr == (uintptr_t)-1)
+			return (WALK_ERR);
+	}
 
 	return (WALK_NEXT);
 }
@@ -72,41 +74,26 @@ lf_walk_init(mdb_walk_state_t *wsp)
 static int
 lf_walk_step(mdb_walk_state_t *wsp)
 {
-	struct lf_walk_data *lfd = wsp->walk_data;
-	uint8_t tgtlf[module_t_size];
+	uint8_t tgtlf[struct_linker_file_size];
 	mdb_linker_file_t lf;
 	int	status;
 
-	if (wsp->walk_addr == lfd->lfd_head)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
-	if (wsp->walk_addr == 0) {
-		wsp->walk_addr = lfd->lfd_head;
-		lfd->lfd_head = 0;
-	}
-
-	/* If this is the start of the list, read TAILQ_FIRST(). */
-	if (wsp->walk_addr == linker_files_addr) {
-		if (mdb_vread(&wsp->walk_addr, sizeof (wsp->walk_addr),
-		    linker_files_addr) == -1) {
-			mdb_warn("failed to read *linker_files\n");
-			return (WALK_ERR);
-		}
-	}
-
 	if (mdb_vread(tgtlf, sizeof (tgtlf), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read linker_file_t at %#lr",
+		mdb_warn("failed to read struct linker_file at %#lr",
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
 	if (mdb_ctf_convert(&lf, "struct linker_file", "mdb_linker_file_t",
 	    tgtlf, 0) == -1) {
-		mdb_warn("failed to parse linker_file_t at %#lr",
+		mdb_warn("failed to parse struct linker_file at %#lr",
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	
+
 	status = wsp->walk_callback(wsp->walk_addr, tgtlf, wsp->walk_cbdata);
 
 	wsp->walk_addr = (uintptr_t)TAILQ_NEXT(&lf, link);
@@ -117,7 +104,6 @@ lf_walk_step(mdb_walk_state_t *wsp)
 static void
 lf_walk_fini(mdb_walk_state_t *wsp)
 {
-	mdb_free(wsp->walk_data, sizeof (struct lf_walk_data));
 }
 
 static int
@@ -132,10 +118,18 @@ lfmod_walk_init(mdb_walk_state_t *wsp)
 	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
+	if (struct_module_size == 0)
+		struct_module_size = mdb_type_size("struct module");
+	if (struct_module_size == -1) {
+		mdb_warn("failed to lookup size of 'struct module'");
+		return (WALK_ERR);
+	}
+
 	/* Fetch the start of the list from the linker file. */
 	if (mdb_ctf_vread(&lf, "struct linker_file", "mdb_linker_file_t",
 	    wsp->walk_addr, 0) == -1) {
-		mdb_warn("failed to read linker_file at %#lr", wsp->walk_addr);
+		mdb_warn("failed to read struct linker_file at %#lr",
+		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
@@ -147,7 +141,7 @@ lfmod_walk_init(mdb_walk_state_t *wsp)
 static int
 lfmod_walk_step(mdb_walk_state_t *wsp)
 {
-	uint8_t tgtmod[module_t_size];
+	uint8_t tgtmod[struct_module_size];
 	mdb_module_t mod;
 	int	status;
 
@@ -248,7 +242,7 @@ kldstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
-		uint8_t lf[linker_file_t_size];
+		uint8_t lf[struct_linker_file_size];
 
 		(void) mdb_vread(lf, sizeof (lf), addr);
 		return (kldstat_format(addr, lf, &verbose));
@@ -284,42 +278,6 @@ static const mdb_modinfo_t kld_modinfo = { MDB_API_VERSION, dcmds, walkers };
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	GElf_Sym sym;
-	mdb_ctf_id_t id;
-	ssize_t size;
-
-	if (mdb_lookup_by_name("linker_files", &sym) == -1) {
-		mdb_warn("failed to lookup 'linker_files'");
-		return (NULL);
-	}
-
-	linker_files_addr = (uintptr_t)sym.st_value;
-
-	if (mdb_ctf_lookup_by_name("struct linker_file", &id) != 0) {
-		mdb_warn("failed to lookup type 'struct linker_file'");
-		return (NULL);
-	}
-
-	size = mdb_ctf_type_size(id);
-	if (size <= 0) {
-		mdb_warn("failed to lookup size of 'struct linker_file'");
-		return (NULL);
-	}
-
-	linker_file_t_size = size;
-
-	if (mdb_ctf_lookup_by_name("struct module", &id) != 0) {
-		mdb_warn("failed to lookup type 'struct module'");
-		return (NULL);
-	}
-
-	size = mdb_ctf_type_size(id);
-	if (size <= 0) {
-		mdb_warn("failed to lookup sizeof of 'struct module'");
-		return (NULL);
-	}
-
-	module_t_size = size;
 
 	return (&kld_modinfo);
 }
