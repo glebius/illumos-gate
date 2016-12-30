@@ -42,7 +42,18 @@
 extern "C" {
 #endif
 
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
+/*
+ * MDB Kernel Support Interfaces:
+ */
+
+/*
+ * Returns TAILQ_FIRST() of a global list identified by name.  Returns
+ * -1 on error.
+ */
+extern uintptr_t mdb_tailq_first(const char *);
+extern ssize_t mdb_type_size(const char *);
+#else
 /*
  * MDB Kernel Support Interfaces:
  *

@@ -45,6 +45,36 @@ typedef struct {
 	u_int msg_seqmod;
 } mdb_msgbuf_t;
 
+uintptr_t
+mdb_tailq_first(const char *name)
+{
+	GElf_Sym sym;
+	uintptr_t val;
+
+	if (mdb_lookup_by_name(name, &sym) == -1) {
+		mdb_warn("failed to lookup '%s'", name);
+		return ((uintptr_t)-1);
+	}
+
+	if (mdb_vread(&val, sizeof(val), sym.st_value) == -1) {
+		mdb_warn("failed to read '%s'", name);
+		return ((uintptr_t)-1);
+	}
+	return (val);
+}
+
+ssize_t
+mdb_type_size(const char *name)
+{
+	mdb_ctf_id_t id;
+
+	if (mdb_ctf_lookup_by_name(name, &id) != 0) {
+		return (-1);
+	}
+
+	return (mdb_ctf_type_size(id));
+}
+
 static int
 dmesg_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
