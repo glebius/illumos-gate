@@ -48,10 +48,17 @@ extern "C" {
  */
 
 /*
+ * Returns LIST_FIRST() of a global list identified by name.  Returns
+ * -1 on error.
+ */
+extern uintptr_t mdb_list_first(const char *);
+
+/*
  * Returns TAILQ_FIRST() of a global list identified by name.  Returns
  * -1 on error.
  */
 extern uintptr_t mdb_tailq_first(const char *);
+
 extern ssize_t mdb_type_size(const char *);
 #else
 /*

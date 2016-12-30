@@ -46,6 +46,24 @@ typedef struct {
 } mdb_msgbuf_t;
 
 uintptr_t
+mdb_list_first(const char *name)
+{
+	GElf_Sym sym;
+	uintptr_t val;
+
+	if (mdb_lookup_by_name(name, &sym) == -1) {
+		mdb_warn("failed to lookup '%s'", name);
+		return ((uintptr_t)-1);
+	}
+
+	if (mdb_vread(&val, sizeof(val), sym.st_value) == -1) {
+		mdb_warn("failed to read '%s'", name);
+		return ((uintptr_t)-1);
+	}
+	return (val);
+}
+
+uintptr_t
 mdb_tailq_first(const char *name)
 {
 	GElf_Sym sym;
