@@ -184,6 +184,26 @@ lfmod_walk_fini(mdb_walk_state_t *wsp)
 }
 
 static int
+lfmod_format(uintptr_t addr, const void *data, void *private)
+{
+	char name[MAXPATHLEN];
+	mdb_module_t mod;
+
+	if (mdb_ctf_convert(&mod, "struct module", "mdb_module_t", data,
+	    0) == -1) {
+		mdb_warn("failed to parse module_t at %#lr", addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)mod.name) == -1)
+		strcpy(name, "???");
+
+	mdb_printf("\t\t%d %s\n", mod.id, name);
+
+	return (WALK_NEXT);
+}
+
+static int
 kldstat_format(uintptr_t addr, const void *data, void *private)
 {
 	char name[MAXPATHLEN], pathname[MAXPATHLEN];
@@ -206,9 +226,13 @@ kldstat_format(uintptr_t addr, const void *data, void *private)
 
 	mdb_printf("%2d %4d 0x%?p %-8lx %s", lf.id, lf.refs, lf.address,
 	    (unsigned long)lf.size, name);
-	if (*verbosep)
-		mdb_printf(" (%s)", pathname);
-	mdb_printf("\n");
+	if (*verbosep) {
+		mdb_printf(" (%s)\n", pathname);
+		mdb_printf("\tContains modules:\n");
+		mdb_printf("\t\tId Name\n");
+		mdb_pwalk("lf_modules", lfmod_format, NULL, addr);
+	} else
+		mdb_printf("\n");
 
 	return (WALK_NEXT);
 }
