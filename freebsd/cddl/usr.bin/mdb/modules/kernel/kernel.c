@@ -520,6 +520,10 @@ pgrep_cb(uintptr_t addr, const void *pdata, void *data)
 		return (WALK_ERR);
 
 	/*
+	 * XXX: Should this also look at thread names?
+	 */
+
+	/*
 	 * kmdb doesn't have access to the reg* functions, so we fall back
 	 * to strstr/strcmp.
 	 */
