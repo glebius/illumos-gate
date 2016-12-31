@@ -30,6 +30,7 @@
 #include <mdb/mdb_ks.h>
 
 #include <sys/proc.h>
+#include <regex.h>
 #include <stdbool.h>
 
 typedef struct {
@@ -56,6 +57,7 @@ typedef struct {
 	LIST_ENTRY(proc) p_list;
 	TAILQ_HEAD(, thread) p_threads;
 	struct ucred	*p_ucred;
+	struct pstats	*p_stats;
 	int		p_flag;
 	enum {
 		PRS_NEW = 0,
@@ -82,6 +84,10 @@ typedef struct {
 	uid_t		cr_ruid;
 	struct prison	*cr_prison;
 } mdb_ucred_t;
+
+typedef struct {
+	struct timeval	p_start;
+} mdb_pstats_t;
 
 static ssize_t struct_proc_size;
 static ssize_t struct_thread_size;
@@ -483,9 +489,174 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+#define	PG_NEWEST	0x0001
+#define	PG_OLDEST	0x0002
+#define	PG_PIPE_OUT	0x0004
+#define	PG_EXACT_MATCH	0x0008
+
+typedef struct pgrep_data {
+	uint_t pg_flags;
+	uint_t pg_psflags;
+	uintptr_t pg_xaddr;
+	hrtime_t pg_xstart;
+	const char *pg_pat;
+#ifndef _KMDB
+	regex_t pg_reg;
+#endif
+} pgrep_data_t;
+
+/*ARGSUSED*/
+static int
+pgrep_cb(uintptr_t addr, const void *pdata, void *data)
+{
+	mdb_proc_t p;
+	mdb_pstats_t pstats;
+	pgrep_data_t *pgp = data;
+#ifndef _KMDB
+	regmatch_t pmatch;
+#endif
+
+	if (mdb_ctf_vread(&p, "struct proc", "mdb_proc_t", addr, 0) == -1)
+		return (WALK_ERR);
+
+	/*
+	 * kmdb doesn't have access to the reg* functions, so we fall back
+	 * to strstr/strcmp.
+	 */
+#ifdef _KMDB
+	if ((pgp->pg_flags & PG_EXACT_MATCH) ?
+	    (strcmp(p.p_comm, pgp->pg_pat) != 0) :
+	    (strstr(p.p_comm, pgp->pg_pat) == NULL))
+		return (WALK_NEXT);
+#else
+	if (regexec(&pgp->pg_reg, p.p_comm, 1, &pmatch, 0) != 0)
+		return (WALK_NEXT);
+
+	if ((pgp->pg_flags & PG_EXACT_MATCH) &&
+	    (pmatch.rm_so != 0 || p.p_comm[pmatch.rm_eo] != '\0'))
+		return (WALK_NEXT);
+#endif
+
+	if (pgp->pg_flags & (PG_NEWEST | PG_OLDEST)) {
+		hrtime_t start;
+
+		if (mdb_ctf_vread(&pstats, "struct pstats", "mdb_pstats_t",
+		    (uintptr_t)p.p_stats, 0) == -1)
+			start = 0;
+		else
+			start = (hrtime_t)pstats.p_start.tv_sec * MICROSEC +
+			    pstats.p_start.tv_usec;
+
+		if (pgp->pg_flags & PG_NEWEST) {
+			if (pgp->pg_xaddr == 0 || start > pgp->pg_xstart) {
+				pgp->pg_xaddr = addr;
+				pgp->pg_xstart = start;
+			}
+		} else {
+			if (pgp->pg_xaddr == 0 || start < pgp->pg_xstart) {
+				pgp->pg_xaddr = addr;
+				pgp->pg_xstart = start;
+			}
+		}
+
+	} else if (pgp->pg_flags & PG_PIPE_OUT) {
+		mdb_printf("%p\n", addr);
+
+	} else {
+		if (mdb_call_dcmd("ps", addr, pgp->pg_psflags, 0, NULL) != 0) {
+			mdb_warn("can't invoke 'ps'");
+			return (WALK_DONE);
+		}
+		pgp->pg_psflags &= ~DCMD_LOOPFIRST;
+	}
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+int
+pgrep(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	pgrep_data_t pg;
+	int i;
+#ifndef _KMDB
+	int err;
+#endif
+
+	if (flags & DCMD_ADDRSPEC)
+		return (DCMD_USAGE);
+
+	pg.pg_flags = 0;
+	pg.pg_xaddr = 0;
+
+	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, PG_NEWEST, &pg.pg_flags,
+	    'o', MDB_OPT_SETBITS, PG_OLDEST, &pg.pg_flags,
+	    'x', MDB_OPT_SETBITS, PG_EXACT_MATCH, &pg.pg_flags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if (argc != 1)
+		return (DCMD_USAGE);
+
+	/*
+	 * -n and -o are mutually exclusive.
+	 */
+	if ((pg.pg_flags & PG_NEWEST) && (pg.pg_flags & PG_OLDEST))
+		return (DCMD_USAGE);
+
+	if (argv->a_type != MDB_TYPE_STRING)
+		return (DCMD_USAGE);
+
+	if (flags & DCMD_PIPE_OUT)
+		pg.pg_flags |= PG_PIPE_OUT;
+
+	pg.pg_pat = argv->a_un.a_str;
+	if (DCMD_HDRSPEC(flags))
+		pg.pg_psflags = DCMD_ADDRSPEC | DCMD_LOOP | DCMD_LOOPFIRST;
+	else
+		pg.pg_psflags = DCMD_ADDRSPEC | DCMD_LOOP;
+
+#ifndef _KMDB
+	if ((err = regcomp(&pg.pg_reg, pg.pg_pat, REG_EXTENDED)) != 0) {
+		size_t nbytes;
+		char *buf;
+
+		nbytes = regerror(err, &pg.pg_reg, NULL, 0);
+		buf = mdb_alloc(nbytes + 1, UM_SLEEP | UM_GC);
+		(void) regerror(err, &pg.pg_reg, buf, nbytes);
+		mdb_warn("%s\n", buf);
+
+		return (DCMD_ERR);
+	}
+#endif
+
+	if (mdb_walk("proc", pgrep_cb, &pg) != 0) {
+		mdb_warn("can't walk 'proc'");
+		return (DCMD_ERR);
+	}
+
+	if (pg.pg_xaddr != 0 && (pg.pg_flags & (PG_NEWEST | PG_OLDEST))) {
+		if (pg.pg_flags & PG_PIPE_OUT) {
+			mdb_printf("%p\n", pg.pg_xaddr);
+		} else {
+			if (mdb_call_dcmd("ps", pg.pg_xaddr, pg.pg_psflags,
+			    0, NULL) != 0) {
+				mdb_warn("can't invoke 'ps'");
+				return (DCMD_ERR);
+			}
+		}
+	}
+
+	return (DCMD_OK);
+}
 
 static const mdb_dcmd_t dcmds[] = {
 	{ "ps", NULL, "list processes (and associated threads)", ps },
+	{ "pgrep", "[-x] [-n | -o] pattern",
+		"pattern match against all processes", pgrep },
 	{ NULL }
 };
 
