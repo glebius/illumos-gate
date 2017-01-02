@@ -38,6 +38,9 @@ typedef struct {
 
 TAILQ_HEAD(pglist, vm_page);
 
+extern int mbuf_walk_init(mdb_walk_state_t *);
+extern int mbuf_walk_step(mdb_walk_state_t *);
+extern void mbuf_walk_fini(mdb_walk_state_t *);
 extern int vm_map_walk_init(mdb_walk_state_t *);
 extern int vm_map_walk_step(mdb_walk_state_t *);
 extern void vm_map_walk_fini(mdb_walk_state_t *);

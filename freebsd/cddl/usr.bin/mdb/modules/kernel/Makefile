@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 MOD=	kernel
-SRCS=	kernel.c kgrep.c vm.c
+SRCS=	kernel.c kgrep.c net.c vm.c
 
 .include <bsd.lib.mk>
 

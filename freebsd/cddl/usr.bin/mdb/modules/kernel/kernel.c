@@ -764,6 +764,10 @@ static const mdb_walker_t walkers[] = {
 	{ "threads", "given a proc pointer, walk its threads",
 	  thread_walk_init, thread_walk_step, thread_walk_fini },
 
+	/* from net.c */
+	{ "mbuf", "given a starting mbuf, walk the chain of mbufs",
+	  mbuf_walk_init, mbuf_walk_step, mbuf_walk_fini },
+
 	/* from vm.c */
 	{ "vm_map", "given a vm_map, walk its vm_map entries",
 	  vm_map_walk_init, vm_map_walk_step, vm_map_walk_fini },
