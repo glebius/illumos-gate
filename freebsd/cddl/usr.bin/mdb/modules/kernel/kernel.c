@@ -156,7 +156,7 @@ proc_walk_step(mdb_walk_state_t *wsp)
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	
+
 	status = wsp->walk_callback(wsp->walk_addr, tgtproc, wsp->walk_cbdata);
 
 	wsp->walk_addr = (uintptr_t)LIST_NEXT(&p, p_list);
@@ -167,8 +167,6 @@ proc_walk_step(mdb_walk_state_t *wsp)
 	}
 
 	return (status);
-	
-		
 }
 
 void
@@ -769,6 +767,8 @@ static const mdb_walker_t walkers[] = {
 	/* from vm.c */
 	{ "vm_map", "given a vm_map, walk its vm_map entries",
 	  vm_map_walk_init, vm_map_walk_step, vm_map_walk_fini },
+	{ "pglist", "given a vm_pagequeue, walk its vm_page structures",
+	  vm_pglist_walk_init, vm_pglist_walk_step, vm_pglist_walk_fini },
 
 	{ NULL }
 };
