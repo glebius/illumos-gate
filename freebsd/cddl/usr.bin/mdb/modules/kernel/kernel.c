@@ -660,15 +660,84 @@ pgrep(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct {
+	kgrep_cb_func *kg_cb;
+	void *kg_cbdata;
+} kgrep_walk_data_t;
+
+static int
+kgrep_walk_vm_map_entry(uintptr_t addr, const void *data, void *private)
+{
+	kgrep_walk_data_t *kwd;
+	mdb_vm_map_entry_t entry;
+	mdb_vm_object_t obj;
+
+	if (mdb_ctf_convert(&entry, "struct vm_map_entry", "mdb_vm_map_entry_t",
+	    data, 0) == -1) {
+		mdb_warn("failed to parse struct vm_map_entry at %#lr", addr);
+		return (WALK_ERR);
+	}
+
+	if (entry.eflags & MAP_ENTRY_IS_SUB_MAP) {
+		if (entry.object.sub_map == NULL)
+			return (WALK_NEXT);
+		return (mdb_pwalk("vm_map", kgrep_walk_vm_map_entry, private,
+		    (uintptr_t)entry.object.sub_map));
+	}
+
+	if (!(entry.protection & VM_PROT_READ))
+		return (WALK_NEXT);
+
+	/*
+	 * If the entry has an associated VM object, skip it if it
+	 * could be mapping a device.
+	 */
+	if (entry.object.vm_object != NULL) {
+		if (mdb_ctf_vread(&obj, "struct vm_object", "mdb_vm_object_t",
+		    (uintptr_t)entry.object.vm_object, 0) == -1) {
+			mdb_warn("failed to read struct vm_object at %#lr",
+			    (uintptr_t)entry.object.vm_object);
+			return (WALK_ERR);
+		}
+
+		switch (obj.type) {
+		case OBJT_DEVICE:
+		case OBJT_SG:
+		case OBJT_MGTDEVICE:
+			return (WALK_NEXT);
+		}
+	}
+
+	kwd = private;
+	return (kwd->kg_cb(entry.start, entry.end, kwd->kg_cbdata));
+}
 
 /*
  * Ideally this would scan all valid kernel memory.
+ *
+ * For now this scans the kernel_map.  This doesn't catch things that
+ * are direct mapped (like small UMA allocations on amd64).
  */
 int
 kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 {
+	uintptr_t kernel_map;
+	kgrep_walk_data_t kwd;
 
-	return (DCMD_ERR);
+	if (mdb_readvar(&kernel_map, "kernel_map") == -1) {
+		mdb_warn("failed to read 'kernel_map'");
+		return (DCMD_ERR);
+	}
+
+	kwd.kg_cb = cb;
+	kwd.kg_cbdata = cbdata;
+	if (mdb_pwalk("vm_map", kgrep_walk_vm_map_entry, &kwd, kernel_map) ==
+	    -1) {
+		mdb_warn("failed to walk kernel_map entries");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
 }
 
 size_t

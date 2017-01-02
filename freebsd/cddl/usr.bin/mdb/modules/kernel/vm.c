@@ -6,11 +6,7 @@
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ks.h>
 
-typedef struct {
-	struct vm_map_entry *next;
-	uintptr_t start;
-	uintptr_t end;
-} mdb_vm_map_entry_t;
+#include "kernel.h"
 
 typedef struct {
 	mdb_vm_map_entry_t header;
