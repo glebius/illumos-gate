@@ -33,6 +33,9 @@
 #include <regex.h>
 #include <stdbool.h>
 
+#include "kernel.h"
+#include "kgrep.h"
+
 typedef struct {
 	TAILQ_ENTRY(thread) td_plist;
 	lwpid_t		td_tid;
@@ -657,18 +660,47 @@ pgrep(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+
+/*
+ * Ideally this would scan all valid kernel memory.
+ */
+int
+kgrep_subr(kgrep_cb_func *cb, void *cbdata)
+{
+
+	return (DCMD_ERR);
+}
+
+size_t
+kgrep_subr_pagesize(void)
+{
+	return (PAGE_SIZE);
+}
+
 static const mdb_dcmd_t dcmds[] = {
+	/* from kernel.c */
 	{ "ps", NULL, "list processes (and associated threads)", ps },
 	{ "pgrep", "[-x] [-n | -o] pattern",
 		"pattern match against all processes", pgrep },
+
+	/* from kgrep.c + kernel.c */
+	{ "kgrep", KGREP_USAGE, "search kernel as for a pointer", kgrep,
+		kgrep_help },
+
 	{ NULL }
 };
 
 static const mdb_walker_t walkers[] = {
+	/* from kernel.c */
 	{ "proc", "list of struct proc structures",
 	  proc_walk_init, proc_walk_step, proc_walk_fini },
 	{ "threads", "given a proc pointer, walk its threads",
 	  thread_walk_init, thread_walk_step, thread_walk_fini },
+
+	/* from vm.c */
+	{ "vm_map", "given a vm_map, walk its vm_map entries",
+	  vm_map_walk_init, vm_map_walk_step, vm_map_walk_fini },
+
 	{ NULL }
 };
 
