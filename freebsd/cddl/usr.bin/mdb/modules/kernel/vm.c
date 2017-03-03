@@ -30,8 +30,13 @@ typedef struct {
 	} plinks;
 } mdb_vm_page_t;
 
+typedef struct {
+	LIST_ENTRY(uma_keg)	uk_link;
+} mdb_uma_keg_t;
+
 static ssize_t struct_vm_map_entry_size;
 static ssize_t struct_vm_page_size;
+static ssize_t struct_uma_keg_size;
 
 int
 vm_map_walk_init(mdb_walk_state_t *wsp)
@@ -164,5 +169,61 @@ vm_pglist_walk_step(mdb_walk_state_t *wsp)
 
 void
 vm_pglist_walk_fini(mdb_walk_state_t *wsp)
+{
+}
+
+int
+uma_keg_walk_init(mdb_walk_state_t *wsp)
+{
+
+	if (struct_uma_keg_size == 0)
+		struct_uma_keg_size = mdb_type_size("struct uma_keg");
+	if (struct_uma_keg_size == -1) {
+		mdb_warn("failed to lookup size of 'struct uma_keg'");
+		return (WALK_ERR);
+	}
+
+	if (wsp->walk_addr == 0) {
+		wsp->walk_addr = mdb_list_first("uma_kegs");
+		if (wsp->walk_addr == (uintptr_t)-1)
+			return (WALK_ERR);
+	}
+		
+	return (WALK_NEXT);
+}
+
+int
+uma_keg_walk_step(mdb_walk_state_t *wsp)
+{
+	uint8_t tgtkeg[struct_uma_keg_size];
+	mdb_uma_keg_t keg;
+	int	status;
+
+	if (wsp->walk_addr == 0)
+		return (WALK_DONE);
+
+	if (mdb_vread(tgtkeg, sizeof (tgtkeg), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read struct uma_keg at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_ctf_convert(&keg, "struct uma_keg", "mdb_uma_keg_t",
+	    tgtkeg, 0) == -1) {
+		mdb_warn("failed to parse struct uma_keg at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, tgtkeg, wsp->walk_cbdata);
+
+	
+	wsp->walk_addr = (uintptr_t)LIST_NEXT(&keg, uk_link);
+
+	return (status);
+}
+
+void
+uma_keg_walk_fini(mdb_walk_state_t *wsp)
 {
 }

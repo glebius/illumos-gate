@@ -47,5 +47,8 @@ extern void vm_map_walk_fini(mdb_walk_state_t *);
 extern int vm_pglist_walk_init(mdb_walk_state_t *);
 extern int vm_pglist_walk_step(mdb_walk_state_t *);
 extern void vm_pglist_walk_fini(mdb_walk_state_t *);
+extern int uma_keg_walk_init(mdb_walk_state_t *);
+extern int uma_keg_walk_step(mdb_walk_state_t *);
+extern void uma_keg_walk_fini(mdb_walk_state_t *);
 
 #endif  /* _MDB_KERNEL_H_ */
