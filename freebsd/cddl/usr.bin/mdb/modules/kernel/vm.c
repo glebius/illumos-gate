@@ -31,12 +31,25 @@ typedef struct {
 } mdb_vm_page_t;
 
 typedef struct {
+	LIST_HEAD(,uma_slab)	uk_part_slab;
+	LIST_HEAD(,uma_slab)	uk_free_slab;
+	LIST_HEAD(,uma_slab)	uk_full_slab;
+
 	LIST_ENTRY(uma_keg)	uk_link;
 } mdb_uma_keg_t;
+
+typedef struct {
+	union {
+		LIST_ENTRY(uma_slab)	_us_link;
+		unsigned long	_us_size;
+	} us_type;
+	uint8_t		*us_data;
+} mdb_uma_slab_t;
 
 static ssize_t struct_vm_map_entry_size;
 static ssize_t struct_vm_page_size;
 static ssize_t struct_uma_keg_size;
+static ssize_t struct_uma_slab_size;
 
 int
 vm_map_walk_init(mdb_walk_state_t *wsp)
@@ -226,4 +239,97 @@ uma_keg_walk_step(mdb_walk_state_t *wsp)
 void
 uma_keg_walk_fini(mdb_walk_state_t *wsp)
 {
+}
+
+struct slab_walk_state {
+	mdb_uma_keg_t keg;
+	enum { FREE, FULL, DONE } state;
+};
+
+int
+uma_slab_walk_init(mdb_walk_state_t *wsp)
+{
+	struct slab_walk_state *ws;
+
+	/*
+	 * This walker requires the address of a UMA keg as the
+	 * starting address.
+	 */
+	if (wsp->walk_addr == 0)
+		return (WALK_ERR);
+
+	if (struct_uma_slab_size == 0)
+		struct_uma_slab_size = mdb_type_size("struct uma_slab");
+	if (struct_uma_slab_size == -1) {
+		mdb_warn("failed to lookup size of 'struct uma_slab'");
+		return (WALK_ERR);
+	}
+
+	ws = mdb_alloc(sizeof(*ws), UM_SLEEP);
+	if (mdb_ctf_vread(&ws->keg, "struct uma_keg", "mdb_uma_keg_t",
+	    wsp->walk_addr, 0) == -1) {
+		mdb_warn("failed to read struct uma_keg at %#lr",
+		    wsp->walk_addr);
+		mdb_free(ws, sizeof(*ws));
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)LIST_FIRST(&ws->keg.uk_part_slab);
+	ws->state = FREE;
+	wsp->walk_data = ws;
+
+	return (WALK_NEXT);
+}
+
+int
+uma_slab_walk_step(mdb_walk_state_t *wsp)
+{
+	struct slab_walk_state *ws;
+	uint8_t tgtslab[struct_uma_slab_size];
+	mdb_uma_slab_t slab;
+	int	status;
+
+	ws = wsp->walk_data;
+	while (wsp->walk_addr == 0) {
+		switch (ws->state) {
+		case FREE:
+			wsp->walk_addr = (uintptr_t)LIST_FIRST(
+			    &ws->keg.uk_free_slab);
+			ws->state = FULL;
+			break;
+		case FULL:
+			wsp->walk_addr = (uintptr_t)LIST_FIRST(
+			    &ws->keg.uk_full_slab);
+			ws->state = DONE;
+			break;
+		default:
+			return (WALK_DONE);
+		}
+	}
+
+	if (mdb_vread(tgtslab, sizeof (tgtslab), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read struct uma_slab at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_ctf_convert(&slab, "struct uma_slab", "mdb_uma_slab_t",
+	    tgtslab, 0) == -1) {
+		mdb_warn("failed to parse struct uma_slab at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, tgtslab, wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)LIST_NEXT(&slab, us_type._us_link);
+
+	return (status);
+}
+
+void
+uma_slab_walk_fini(mdb_walk_state_t *wsp)
+{
+
+	mdb_free(wsp->walk_data, sizeof(struct slab_walk_state));
 }

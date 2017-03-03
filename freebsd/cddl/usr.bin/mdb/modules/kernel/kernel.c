@@ -773,8 +773,10 @@ static const mdb_walker_t walkers[] = {
 	  vm_map_walk_init, vm_map_walk_step, vm_map_walk_fini },
 	{ "pglist", "given a vm_pagequeue, walk its vm_page structures",
 	  vm_pglist_walk_init, vm_pglist_walk_step, vm_pglist_walk_fini },
-	{ "uma_keg", "list of UMA keg structures",
+	{ "uma_keg", "list of uma_keg structures",
 	  uma_keg_walk_init, uma_keg_walk_step, uma_keg_walk_fini },
+	{ "uma_slab", "given a uma_keg, walk its uma_slab structures",
+	  uma_slab_walk_init, uma_slab_walk_step, uma_slab_walk_fini },
 
 	{ NULL }
 };
