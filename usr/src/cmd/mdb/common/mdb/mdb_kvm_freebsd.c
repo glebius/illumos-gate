@@ -105,6 +105,18 @@ typedef struct kt_maparg {
 static const char KT_MODULE[] = "mdb_ks";
 static const char KT_CTFPARENT[] = "kernel";
 
+static const char *
+sysroot_path(const char *path)
+{
+	static char buf[MAXPATHLEN];
+
+	if (mdb_sysroot == NULL)
+		return (path);
+	(void) mdb_iob_snprintf(buf, MAXPATHLEN, "%s/%s", mdb_sysroot,
+	    path);
+	return (buf);
+}
+
 static void
 kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 {
@@ -263,7 +275,7 @@ kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 
 		km = mdb_zalloc(sizeof (kt_module_t), UM_SLEEP);
 		km->km_name = strdup(name);
-		km->km_pathname = strdup(pathname);
+		km->km_pathname = strdup(sysroot_path(pathname));
 
 		(void) mdb_nv_insert(&kt->k_modules, km->km_name, NULL,
 		    (uintptr_t)km, MDB_NV_EXTNAME);

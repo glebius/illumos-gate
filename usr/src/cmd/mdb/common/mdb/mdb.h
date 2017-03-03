@@ -201,6 +201,7 @@ typedef struct mdb {
 } mdb_t;
 
 extern mdb_t mdb;
+extern const char *mdb_sysroot;
 
 #ifdef _MDB
 

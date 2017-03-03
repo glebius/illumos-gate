@@ -126,6 +126,11 @@ ucontext_t _mdb_abort_ctx;		/* context fatal signal interrupted */
 int _mdb_abort_rcount;			/* number of times resume requested */
 int _mdb_self_fd = -1;			/* fd for self as for valid_frame */
 
+/*
+ * Prefix applied to target filenames.
+ */
+const char *mdb_sysroot;
+
 static void
 terminate(int status)
 {
@@ -547,8 +552,11 @@ main(int argc, char *argv[], char *envp[])
 
 	while (optind < argc) {
 		while ((c = getopt(argc, argv,
-		    "e:fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
+		    "c:e:fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
 			switch (c) {
+			case 'c':
+				mdb_sysroot = optarg;
+				break;
 			case 'e':
 				if (eflag != NULL) {
 					warn("-e already specified\n");
