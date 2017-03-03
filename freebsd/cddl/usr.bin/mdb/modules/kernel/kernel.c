@@ -37,6 +37,7 @@
 #include "kgrep.h"
 
 typedef struct {
+	struct proc	*td_proc;
 	TAILQ_ENTRY(thread) td_plist;
 	lwpid_t		td_tid;
 	int		td_flags;
@@ -162,7 +163,7 @@ proc_walk_step(mdb_walk_state_t *wsp)
 
 	wsp->walk_addr = (uintptr_t)LIST_NEXT(&p, p_list);
 	if (wsp->walk_addr == 0 && p.p_state != PRS_ZOMBIE) {
-		wsp->walk_addr = mdb_tailq_first("zombproc");
+		wsp->walk_addr = mdb_list_first("zombproc");
 		if (wsp->walk_addr == (uintptr_t)-1)
 			wsp->walk_addr = 0;
 	}
@@ -176,7 +177,7 @@ proc_walk_fini(mdb_walk_state_t *wsp)
 }
 
 static int
-thread_walk_init(mdb_walk_state_t *wsp)
+threads_walk_init(mdb_walk_state_t *wsp)
 {
 	mdb_proc_t p;
 
@@ -194,7 +195,7 @@ thread_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	/* Fetch the start of the list from the linker file. */
+	/* Fetch the start of the list from the proc. */
 	if (mdb_ctf_vread(&p, "struct proc", "mdb_proc_t",
 	    wsp->walk_addr, 0) == -1) {
 		mdb_warn("failed to read struct proc at %#lr",
@@ -208,7 +209,7 @@ thread_walk_init(mdb_walk_state_t *wsp)
 }
 
 static int
-thread_walk_step(mdb_walk_state_t *wsp)
+threads_walk_step(mdb_walk_state_t *wsp)
 {
 	uint8_t tgttd[struct_thread_size];
 	mdb_thread_t td;
@@ -238,8 +239,117 @@ thread_walk_step(mdb_walk_state_t *wsp)
 }
 
 static void
+threads_walk_fini(mdb_walk_state_t *wsp)
+{
+}
+
+static int
+thread_walk_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr;
+	mdb_proc_t *p;
+	mdb_thread_t td;
+
+	if (struct_thread_size == 0)
+		struct_thread_size = mdb_type_size("struct thread");
+	if (struct_thread_size == -1) {
+		mdb_warn("failed to lookup size of 'struct thread'");
+		return (WALK_ERR);
+	}
+	if (struct_proc_size == 0)
+		struct_proc_size = mdb_type_size("struct proc");
+	if (struct_proc_size == -1) {
+		mdb_warn("failed to lookup size of 'struct proc'");
+		return (WALK_ERR);
+	}
+
+	p = mdb_alloc(sizeof(*p), UM_SLEEP);
+	if (wsp->walk_addr == 0) {
+		addr = mdb_list_first("allproc");
+		if (addr == (uintptr_t)-1) {
+			mdb_free(p, sizeof(*p));
+			return (WALK_ERR);
+		}
+		if (mdb_ctf_vread(p, "struct proc", "mdb_proc_t", addr, 0) ==
+		    -1) {
+			mdb_warn("failed to read struct proc at %#lr",
+			    addr);
+			mdb_free(p, sizeof(*p));
+			return (WALK_ERR);
+		}
+		wsp->walk_addr = (uintptr_t)TAILQ_FIRST(&p->p_threads);
+	} else {
+		if (mdb_ctf_vread(&td, "struct thread", "mdb_thread_t",
+		    wsp->walk_addr, 0) == -1) {
+			mdb_warn("failed to read struct thread at %#lr",
+			    wsp->walk_addr);
+			mdb_free(p, sizeof(*p));
+			return (WALK_ERR);
+		}
+		if (mdb_ctf_vread(p, "struct proc", "mdb_proc_t",
+		    (uintptr_t)td.td_proc, 0) == -1) {
+			mdb_warn("failed to read struct proc at %#lr",
+			    (uintptr_t)td.td_proc);
+			mdb_free(p, sizeof(*p));
+			return (WALK_ERR);
+		}
+	}
+	wsp->walk_data = p;
+
+	return (WALK_NEXT);
+}
+
+static int
+thread_walk_step(mdb_walk_state_t *wsp)
+{
+	mdb_proc_t *p;
+	uint8_t tgttd[struct_thread_size];
+	mdb_thread_t td;
+	uintptr_t addr;
+	int	status;
+
+	if (wsp->walk_addr == 0) {
+		p = wsp->walk_data;
+		addr = (uintptr_t)LIST_NEXT(p, p_list);
+		if (addr == 0 && p->p_state != PRS_ZOMBIE) {
+			addr = mdb_list_first("zombproc");
+			if (addr == (uintptr_t)-1)
+				addr = 0;
+		}
+		if (addr == 0)
+			return (WALK_DONE);
+		if (mdb_ctf_vread(p, "struct proc", "mdb_proc_t", addr, 0) ==
+		    -1) {
+			mdb_warn("failed to read struct proc at %#lr", addr);
+			return (WALK_ERR);
+		}
+		wsp->walk_addr = (uintptr_t)TAILQ_FIRST(&p->p_threads);
+	}
+
+	if (mdb_vread(tgttd, sizeof (tgttd), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read struct thread at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_ctf_convert(&td, "struct thread", "mdb_thread_t", tgttd,
+	    0) == -1) {
+		mdb_warn("failed to parse struct thread at %#lr",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, tgttd, wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)TAILQ_NEXT(&td, td_plist);
+
+	return (status);
+}
+
+static void
 thread_walk_fini(mdb_walk_state_t *wsp)
 {
+	mdb_free(wsp->walk_data, sizeof(mdb_proc_t));
 }
 
 struct thread_states {
@@ -784,7 +894,7 @@ kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 			uma_small_alloc_addr = sym.st_value;
 	}
 	if (uma_small_alloc_addr != (uintptr_t)-1) {
-		if (mdb_pwalk("uma_keg", kgrep_walk_uma_keg, &kwd, 0) == -1) {
+		if (mdb_walk("uma_keg", kgrep_walk_uma_keg, &kwd) == -1) {
 			mdb_warn("failed to walk UMA kegs");
 			return (DCMD_ERR);
 		}
@@ -817,6 +927,8 @@ static const mdb_walker_t walkers[] = {
 	{ "proc", "list of struct proc structures",
 	  proc_walk_init, proc_walk_step, proc_walk_fini },
 	{ "threads", "given a proc pointer, walk its threads",
+	  threads_walk_init, threads_walk_step, threads_walk_fini },
+	{ "thread", "global list of struct thread structures",
 	  thread_walk_init, thread_walk_step, thread_walk_fini },
 
 	/* from net.c */
