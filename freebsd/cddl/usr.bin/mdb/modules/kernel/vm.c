@@ -30,22 +30,6 @@ typedef struct {
 	} plinks;
 } mdb_vm_page_t;
 
-typedef struct {
-	LIST_HEAD(,uma_slab)	uk_part_slab;
-	LIST_HEAD(,uma_slab)	uk_free_slab;
-	LIST_HEAD(,uma_slab)	uk_full_slab;
-
-	LIST_ENTRY(uma_keg)	uk_link;
-} mdb_uma_keg_t;
-
-typedef struct {
-	union {
-		LIST_ENTRY(uma_slab)	_us_link;
-		unsigned long	_us_size;
-	} us_type;
-	uint8_t		*us_data;
-} mdb_uma_slab_t;
-
 static ssize_t struct_vm_map_entry_size;
 static ssize_t struct_vm_page_size;
 static ssize_t struct_uma_keg_size;

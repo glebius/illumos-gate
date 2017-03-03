@@ -95,6 +95,7 @@ typedef struct {
 static ssize_t struct_proc_size;
 static ssize_t struct_thread_size;
 static uintptr_t prison0_addr;
+static uintptr_t uma_small_alloc_addr;
 
 static bool
 jailed(mdb_ucred_t *cred)
@@ -710,6 +711,45 @@ kgrep_walk_vm_map_entry(uintptr_t addr, const void *data, void *private)
 	return (kwd->kg_cb(entry.start, entry.end, kwd->kg_cbdata));
 }
 
+static int
+kgrep_walk_uma_slab(uintptr_t addr, const void *data, void *private)
+{
+	kgrep_walk_data_t *kwd;
+	mdb_uma_slab_t slab;
+	uintptr_t start;
+
+	if (mdb_ctf_convert(&slab, "struct uma_slab", "mdb_uma_slab_t", data,
+	    0) == -1) {
+		mdb_warn("failed to parse struct uma_slab at %#lr", addr);
+		return (WALK_ERR);
+	}
+
+	start = (uintptr_t)slab.us_data;
+	kwd = private;
+	return (kwd->kg_cb(start, start + PAGE_SIZE, kwd->kg_cbdata));
+}
+
+static int
+kgrep_walk_uma_keg(uintptr_t addr, const void *data, void *private)
+{
+	mdb_uma_keg_t keg;
+
+	if (mdb_ctf_convert(&keg, "struct uma_keg", "mdb_uma_keg_t", data, 0) ==
+	    -1) {
+		mdb_warn("failed to parse struct uma_keg at %#lr", addr);
+		return (WALK_ERR);
+	}
+
+	if ((uintptr_t)keg.uk_allocf != uma_small_alloc_addr)
+		return (WALK_NEXT);
+
+	if (mdb_pwalk("uma_slab", kgrep_walk_uma_slab, private, addr) == -1) {
+		mdb_warn("failed to walk UMA slabs for keg at %#lr", addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
 /*
  * Ideally this would scan all valid kernel memory.
  *
@@ -735,6 +775,21 @@ kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 		return (DCMD_ERR);
 	}
 
+	if (uma_small_alloc_addr == 0) {
+		GElf_Sym sym;
+
+		if (mdb_lookup_by_name("uma_small_alloc", &sym) == -1)
+			uma_small_alloc_addr = (uintptr_t)-1;
+		else
+			uma_small_alloc_addr = sym.st_value;
+	}
+	if (uma_small_alloc_addr != (uintptr_t)-1) {
+		if (mdb_pwalk("uma_keg", kgrep_walk_uma_keg, &kwd, 0) == -1) {
+			mdb_warn("failed to walk UMA kegs");
+			return (DCMD_ERR);
+		}
+	}
+	
 	return (DCMD_OK);
 }
 

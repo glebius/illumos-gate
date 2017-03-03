@@ -36,6 +36,24 @@ typedef struct {
 	objtype_t type;
 } mdb_vm_object_t;
 
+typedef struct {
+	LIST_HEAD(,uma_slab)	uk_part_slab;
+	LIST_HEAD(,uma_slab)	uk_free_slab;
+	LIST_HEAD(,uma_slab)	uk_full_slab;
+
+	void *uk_allocf;
+
+	LIST_ENTRY(uma_keg)	uk_link;
+} mdb_uma_keg_t;
+
+typedef struct {
+	union {
+		LIST_ENTRY(uma_slab)	_us_link;
+		unsigned long	_us_size;
+	} us_type;
+	uint8_t		*us_data;
+} mdb_uma_slab_t;
+
 TAILQ_HEAD(pglist, vm_page);
 
 extern int mbuf_walk_init(mdb_walk_state_t *);
