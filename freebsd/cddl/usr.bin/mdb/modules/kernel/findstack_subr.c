@@ -88,14 +88,16 @@ fetch_pc_sp(mdb_thread_t *td, uintptr_t *pc, uintptr_t *sp)
  */
 static int
 crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
-      int kill_fp, uintptr_t pc, findstack_info_t *fsip)
+      int kill_fp, findstack_info_t *fsip)
 {
+	uintptr_t pc, next_pc;
 	char funcname[MDB_TGT_SYM_NAMLEN];
 	int levels = 0;
 	int hit_bottom = 0;
 
 	fsip->fsi_depth = 0;
 	fsip->fsi_overflow = 0;
+	next_pc = (uintptr_t)-1;
 
 	fs_dprintf(("<0> frame = %p, kbase = %p, ktop = %p, ubase = %p\n",
 	    frame, kbase, ktop, ubase));
@@ -108,6 +110,12 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 		if ((frame & (STACK_ALIGN - 1)) != 0)
 			break;
 
+		fp = ((struct rwindow *)frame)->rw_fp + STACK_BIAS;
+		if (next_pc != (uintptr_t)-1) {
+			pc = next_pc;
+			next_pc = (uintptr_t)-1;
+		} else
+			pc = ((struct rwindow *)frame)->rw_rtn;
 #ifdef __amd64__
 		if (pc != 0 && mdb_lookup_by_addr(pc, MDB_TGT_SYM_FUZZY,
 		    funcname, sizeof(funcname), NULL) == 0 &&
@@ -132,19 +140,15 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 			struct trapframe *tf;
 
 			tf = (struct trapframe *)(frame + 16);
-			pc = tf->tf_rip;
+			next_pc = tf->tf_rip;
 			fp = tf->tf_rbp;
 			fpp = &tf->tf_rbp;
 
 			if (strcmp(funcname, "fork_trampoline") == 0 ||
-			    pc < 0x0000800000000000)
+			    next_pc < 0x0000800000000000)
 				hit_bottom = 1;
-		} else
-#endif
-		{
-			fp = ((struct rwindow *)frame)->rw_fp + STACK_BIAS;
-			pc = ((struct rwindow *)frame)->rw_rtn;
 		}
+#endif
 
 		if (fsip->fsi_depth < fsip->fsi_max_depth)
 			fsip->fsi_stack[fsip->fsi_depth++] = pc;
@@ -284,7 +288,7 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	if (fetch_pc_sp(&td, &pc, &tsp)) {
 		sp = KTOU(tsp + STACK_BIAS);
 		if (sp >= ubase && sp <= utop) {
-			if (crawl(sp, kbase, ktop, ubase, 0, pc, fsip) ==
+			if (crawl(sp, kbase, ktop, ubase, 0, fsip) ==
 			    CRAWL_FOUNDALL) {
 				fsip->fsi_sp = tsp;
 				fsip->fsi_pc = pc;
@@ -300,7 +304,7 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	for (win = ubase;
 	    win + sizeof (struct rwindow) <= utop;
 	    win += sizeof (struct rwindow *)) {
-		if (crawl(win, kbase, ktop, ubase, 1, 0, fsip) == CRAWL_FOUNDALL) {
+		if (crawl(win, kbase, ktop, ubase, 1, fsip) == CRAWL_FOUNDALL) {
 			fsip->fsi_sp = UTOK(win) - STACK_BIAS;
 			goto found;
 		}
@@ -320,7 +324,7 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 		uintptr_t fp = ((struct rwindow *)win)->rw_fp;
 		int levels;
 
-		if ((levels = crawl(win, kbase, ktop, ubase, 1, 0, fsip)) > 1) {
+		if ((levels = crawl(win, kbase, ktop, ubase, 1, fsip)) > 1) {
 			if (print_warnings)
 				mdb_printf("  %p (%d)\n", fp, levels);
 		} else if (levels == CRAWL_FOUNDALL) {
