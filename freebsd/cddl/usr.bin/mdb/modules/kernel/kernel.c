@@ -32,48 +32,12 @@
 #include <sys/proc.h>
 #include <regex.h>
 #include <stdbool.h>
+#include <string.h>
 
+#include "findstack.h"
 #include "kernel.h"
 #include "kgrep.h"
-
-typedef struct {
-	struct proc	*td_proc;
-	TAILQ_ENTRY(thread) td_plist;
-	lwpid_t		td_tid;
-	int		td_flags;
-	int		td_inhibitors;
-	void		*td_wchan;
-	const char	*td_wmesg;
-	struct turnstile *td_blocked;
-	const char	*td_lockname;
-	char		td_name[MAXCOMLEN + 1];
-	enum {
-		TDS_INACTIVE = 0x0,
-		TDS_INHIBITED,
-		TDS_CAN_RUN,
-		TDS_RUNQ,
-		TDS_RUNNING
-	} td_state;
-	int		td_oncpu;
-} mdb_thread_t;
-
-typedef struct {
-	LIST_ENTRY(proc) p_list;
-	TAILQ_HEAD(, thread) p_threads;
-	struct ucred	*p_ucred;
-	struct pstats	*p_stats;
-	int		p_flag;
-	enum {
-		PRS_NEW = 0,
-		PRS_NORMAL,
-		PRS_ZOMBIE
-	} p_state;
-	pid_t		p_pid;
-	struct proc	*p_pptr;
-	u_int		p_lock;
-	char		p_comm[MAXCOMLEN + 1];
-	struct pgrp	*p_pgrp;
-} mdb_proc_t;
+#include "freebsd_thread.h"
 
 typedef struct {
 	struct proc	*s_leader;
@@ -601,6 +565,75 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+void
+thread_state_to_text(uint_t state, char *buf, size_t len)
+{
+
+	switch (state) {
+	case TS_NEW:
+		strlcpy(buf, "NEW", len);
+		break;
+	case TS_RUNNING:
+		strlcpy(buf, "RUNNING", len);
+		break;
+	case TS_RUNQ:
+		strlcpy(buf, "RUNQ", len);
+		break;
+	case TS_CAN_RUN:
+		strlcpy(buf, "CAN_RUN", len);
+		break;
+	case TS_INACTIVE:
+		strlcpy(buf, "INACTIVE", len);
+		break;
+	case TS_INHIBITED:
+		strlcpy(buf, "INHIBITED", len);
+		break;
+	case TS_ZOMBIE:
+		strlcpy(buf, "ZOMBIE", len);
+		break;
+	default:
+		snprintf(buf, len, "??? (%d)", state);
+		break;
+	}
+}
+
+int
+thread_text_to_state(const char *buf, uint_t *state)
+{
+
+	if (strcasecmp(buf, "NEW") == 0)
+		*state = TS_NEW;
+	else if (strcasecmp(buf, "RUNNING") == 0)
+		*state = TS_RUNNING;
+	else if (strcasecmp(buf, "RUNQ") == 0)
+		*state = TS_RUNQ;
+	else if (strcasecmp(buf, "CAN_RUN") == 0)
+		*state = TS_CAN_RUN;
+	else if (strcasecmp(buf, "INACTIVE") == 0)
+		*state = TS_INACTIVE;
+	else if (strcasecmp(buf, "INHIBITED") == 0)
+		*state = TS_INHIBITED;
+	else if (strcasecmp(buf, "ZOMBIE") == 0)
+		*state = TS_ZOMBIE;
+	else
+		return (-1);
+	return (0);
+}
+
+void
+thread_walk_states(void (*cb)(uint_t, const char *, void *), void *arg)
+{
+
+	cb(TS_NEW, "NEW", arg);
+	cb(TS_RUNNING, "RUNNING", arg);
+	cb(TS_RUNQ, "RUNQ", arg);
+	cb(TS_CAN_RUN, "CAN_RUN", arg);
+	cb(TS_INACTIVE, "INACTIVE", arg);
+	cb(TS_INHIBITED, "INHIBITED", arg);
+	cb(TS_ZOMBIE, "ZOMBIE", arg);
+}
+
+
 #define	PG_NEWEST	0x0001
 #define	PG_OLDEST	0x0002
 #define	PG_PIPE_OUT	0x0004
@@ -910,6 +943,15 @@ kgrep_subr_pagesize(void)
 }
 
 static const mdb_dcmd_t dcmds[] = {
+	/* from findstack.c */
+	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
+	{ "findstack_debug", NULL, "toggle findstack debugging",
+		findstack_debug },
+	{ "stacks", "?[-afiv] [-c func] [-C func] [-m module] [-M module] "
+		"[-t tstate | -T tstate]",
+		"print unique kernel thread stacks",
+		stacks, stacks_help },
+
 	/* from kernel.c */
 	{ "ps", NULL, "list processes (and associated threads)", ps },
 	{ "pgrep", "[-x] [-n | -o] pattern",

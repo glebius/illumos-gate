@@ -37,7 +37,12 @@ typedef struct findstack_info {
 	uintptr_t	*fsi_stack;	/* place to record frames */
 	uintptr_t	fsi_sp;		/* stack pointer */
 	uintptr_t	fsi_pc;		/* pc */
+#ifdef __FreeBSD__
+	uintptr_t	fsi_wmesg;	/* wait message */
+	uintptr_t	fsi_lockname;	/* lock name */
+#else
 	uintptr_t	fsi_sobj_ops;	/* sobj_ops */
+#endif
 	uint_t		fsi_tstate;	/* t_state */
 	uchar_t		fsi_depth;	/* stack depth */
 	uchar_t		fsi_failed;	/* search failed */

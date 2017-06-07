@@ -5,6 +5,50 @@
 #ifndef _MDB_KERNEL_H_
 #define _MDB_KERNEL_H_
 
+#include <sys/queue.h>
+
+typedef struct {
+	struct proc	*td_proc;
+	TAILQ_ENTRY(thread) td_plist;
+	lwpid_t		td_tid;
+	int		td_flags;
+	int		td_inhibitors;
+	void		*td_wchan;
+	const char	*td_wmesg;
+	struct turnstile *td_blocked;
+	const char	*td_lockname;
+	char		td_name[MAXCOMLEN + 1];
+	struct pcb	*td_pcb;
+	enum {
+		TDS_INACTIVE = 0x0,
+		TDS_INHIBITED,
+		TDS_CAN_RUN,
+		TDS_RUNQ,
+		TDS_RUNNING
+	} td_state;
+	uintptr_t	td_kstack;
+	int		td_kstack_pages;
+	int		td_oncpu;
+} mdb_thread_t;
+
+typedef struct {
+	LIST_ENTRY(proc) p_list;
+	TAILQ_HEAD(, thread) p_threads;
+	struct ucred	*p_ucred;
+	struct pstats	*p_stats;
+	int		p_flag;
+	enum {
+		PRS_NEW = 0,
+		PRS_NORMAL,
+		PRS_ZOMBIE
+	} p_state;
+	pid_t		p_pid;
+	struct proc	*p_pptr;
+	u_int		p_lock;
+	char		p_comm[MAXCOMLEN + 1];
+	struct pgrp	*p_pgrp;
+} mdb_proc_t;
+
 /* XXX: Can't include <vm/vm.h> directly due to conflicts with boolean_t. */
 typedef u_char vm_prot_t;	/* protection codes */
 

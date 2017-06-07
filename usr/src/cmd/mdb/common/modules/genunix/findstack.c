@@ -28,15 +28,21 @@
 #include <mdb/mdb_ctf.h>
 
 #include <sys/types.h>
+#ifndef __FreeBSD__
 #include <sys/regset.h>
 #include <sys/stack.h>
 #include <sys/thread.h>
 #include <sys/modctl.h>
+#endif
 #include <assert.h>
 
 #include "findstack.h"
+#ifndef __FreeBSD__
 #include "thread.h"
 #include "sobj.h"
+#else
+#include "freebsd_thread.h"
+#endif
 
 int findstack_debug_on = 0;
 
@@ -117,6 +123,7 @@ uppercase(char *p)
 	}
 }
 
+#ifndef __FreeBSD__
 static void
 sobj_to_text(uintptr_t addr, char *out, size_t out_sz)
 {
@@ -136,6 +143,7 @@ text_to_sobj(const char *text, uintptr_t *out)
 
 	return (sobj_text_to_ops(text, out));
 }
+#endif
 
 #define	TSTATE_PANIC	-2U
 static int
@@ -165,7 +173,12 @@ typedef struct stacks_entry {
 	struct stacks_entry	*se_dup;	/* dups of this stack */
 	uintptr_t		se_thread;
 	uintptr_t		se_sp;
+#ifdef __FreeBSD__
+	uintptr_t		se_wmesg;
+	uintptr_t		se_lockname;
+#else
 	uintptr_t		se_sobj_ops;
+#endif
 	uint32_t		se_tstate;
 	uint32_t		se_count;	/* # threads w/ this stack */
 	uint8_t			se_overflow;
@@ -290,10 +303,12 @@ stacks_entry_comp_impl(stacks_entry_t *l, stacks_entry_t *r,
 	if (l->se_depth < r->se_depth)
 		return (-1);
 
+#ifndef __FreeBSD__
 	if (l->se_sobj_ops > r->se_sobj_ops)
 		return (1);
 	if (l->se_sobj_ops < r->se_sobj_ops)
 		return (-1);
+#endif
 
 	return (0);
 }
@@ -310,7 +325,7 @@ stacks_entry_comp(const void *l_arg, const void *r_arg)
 void
 stacks_cleanup(int force)
 {
-	int idx = 0;
+	size_t idx = 0;
 	stacks_entry_t *cur, *next;
 
 	if (stacks_state == STACKS_STATE_CLEAN)
@@ -375,7 +390,7 @@ stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 	findstack_info_t *fsip = &sip->si_fsi;
 
 	stacks_entry_t **sepp, *nsep, *sep;
-	int idx;
+	size_t idx;
 	size_t depth;
 
 	if (stacks_findstack(addr, fsip, 0) != DCMD_OK &&
@@ -390,7 +405,12 @@ stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 	nsep = mdb_zalloc(STACKS_ENTRY_SIZE(depth), UM_SLEEP);
 	nsep->se_thread = addr;
 	nsep->se_sp = fsip->fsi_sp;
+#ifdef __FreeBSD__
+	nsep->se_wmesg = fsip->fsi_wmesg;
+	nsep->se_lockname = fsip->fsi_lockname;
+#else
 	nsep->se_sobj_ops = fsip->fsi_sobj_ops;
+#endif
 	nsep->se_tstate = fsip->fsi_tstate;
 	nsep->se_count = 1;
 	nsep->se_overflow = fsip->fsi_overflow;
@@ -594,9 +614,11 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *module_str = NULL;
 	const char *excl_module_str = NULL;
 	stacks_module_t module, excl_module;
+#ifndef __FreeBSD__
 	const char *sobj = NULL;
 	const char *excl_sobj = NULL;
 	uintptr_t sobj_ops = 0, excl_sobj_ops = 0;
+#endif
 	const char *tstate_str = NULL;
 	const char *excl_tstate_str = NULL;
 	uint_t tstate = -1U;
@@ -634,14 +656,25 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'C', MDB_OPT_STR, &excl_caller_str,
 	    'm', MDB_OPT_STR, &module_str,
 	    'M', MDB_OPT_STR, &excl_module_str,
+#ifndef __FreeBSD__
 	    's', MDB_OPT_STR, &sobj,
 	    'S', MDB_OPT_STR, &excl_sobj,
+#endif
 	    't', MDB_OPT_STR, &tstate_str,
 	    'T', MDB_OPT_STR, &excl_tstate_str,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (interesting) {
+#ifdef __FreeBSD__
+		/* XXX: Not really sure what to map this to for FreeBSD. */
+		if (tstate_str != NULL || excl_tstate_str != NULL) {
+			mdb_warn(
+			    "stacks: -i is incompatible with -[tT]\n");
+			return (DCMD_USAGE);
+		}
+		excl_tstate_str = "INHIBITED";
+#else
 		if (sobj != NULL || excl_sobj != NULL ||
 		    tstate_str != NULL || excl_tstate_str != NULL) {
 			mdb_warn(
@@ -650,6 +683,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 		excl_sobj = "CV";
 		excl_tstate_str = "FREE";
+#endif
 	}
 
 	if (caller_str != NULL) {
@@ -680,6 +714,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    stacks_module_find(excl_module_str, &excl_module) != 0)
 		return (DCMD_ABORT);
 
+#ifndef __FreeBSD__
 	if (sobj != NULL && text_to_sobj(sobj, &sobj_ops) != 0)
 		return (DCMD_USAGE);
 
@@ -690,6 +725,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("stacks: only one of -s and -S can be specified\n");
 		return (DCMD_USAGE);
 	}
+#endif
 
 	if (tstate_str != NULL && text_to_tstate(tstate_str, &tstate) != 0)
 		return (DCMD_USAGE);
@@ -819,6 +855,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				continue;
 		}
 
+#ifndef __FreeBSD__
 		if (sobj_ops == SOBJ_ALL) {
 			if (sep->se_sobj_ops == 0)
 				continue;
@@ -836,6 +873,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 					continue;
 			}
 		}
+#endif
 
 		if (flags & DCMD_PIPE_OUT) {
 			while (sep != NULL) {
@@ -847,17 +885,46 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		if (all || !printed) {
+#ifdef __FreeBSD__
+			mdb_printf("%<u>%-?s %-9s %-?s %8s%</u>\n",
+			    "THREAD", "STATE", "MWCHAN", "COUNT");
+#else
 			mdb_printf("%<u>%-?s %-8s %-?s %8s%</u>\n",
 			    "THREAD", "STATE", "SOBJ", "COUNT");
+#endif
 			printed = 1;
 		}
 
 		do {
 			char state[20];
+#ifdef __FreeBSD__
+			char mwchan[20];
+#else
 			char sobj[100];
+#endif
 
 			tstate_to_text(cur->se_tstate, cur->se_panic,
 			    state, sizeof (state));
+#ifdef __FreeBSD__
+			if (cur->se_lockname != 0) {
+				mwchan[0] = '*';
+				if (mdb_readstr(mwchan + 1, sizeof(mwchan) - 1,
+				    cur->se_lockname) == -1)
+					mwchan[0] = '\0';
+			} else if (cur->se_wmesg != 0) {
+				if (mdb_readstr(mwchan, sizeof(mwchan),
+				    cur->se_wmesg) == -1)
+					mwchan[0] = '\0';
+			} else
+				mwchan[0] = '\0';
+
+			if (cur == sep)
+				mdb_printf("%-?p %-9s %-?s %8d\n",
+				    cur->se_thread, state, mwchan, count);
+			else
+				mdb_printf("%-?p %-9s %-?s %8s\n",
+				    cur->se_thread, state, mwchan, "-");
+#else
 			sobj_to_text(cur->se_sobj_ops,
 			    sobj, sizeof (sobj));
 
@@ -867,12 +934,13 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			else
 				mdb_printf("%-?p %-8s %-?s %8s\n",
 				    cur->se_thread, state, sobj, "-");
+#endif
 
 			cur = only_matching ? cur->se_next : cur->se_dup;
 		} while (all && cur != NULL);
 
 		if (sep->se_failed != 0) {
-			char *reason;
+			const char *reason;
 			switch (sep->se_failed) {
 			case FSI_FAIL_NOTINMEMORY:
 				reason = "thread not in memory";
