@@ -5,7 +5,7 @@ CDDL_TOP=	${.CURDIR}/../../../../../..
 MDB_DIR=	${CDDL_TOP}/usr/src/cmd/mdb
 
 SHLIB_NAME?=	${MOD}.so
-SHLIBDIR?=	/usr/lib/mdb/kvm/${MACHINE_ARCH}
+SHLIBDIR?=	${LIBDIR}/mdb/kvm/${MACHINE_ARCH}
 
 CFLAGS+= -I${LOCAL_CDDL}/sys/cddl/compat/opensolaris \
 	-I${FREEBSD_SRC_DIR}/sys/cddl/compat/opensolaris \
