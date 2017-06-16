@@ -20,6 +20,7 @@ CFLAGS+= -I${MDB_DIR}/common
 CWARNFLAGS.clang+= \
 	-Wno-missing-field-initializers \
 	-Wno-missing-prototypes \
+	-Wno-strict-prototypes \
 	-Wno-unused-parameter
 
 .include "../Makefile.inc"

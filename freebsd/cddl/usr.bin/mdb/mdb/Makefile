@@ -200,5 +200,6 @@ CWARNFLAGS.clang+= \
 	-Wno-missing-variable-declarations \
 	-Wno-shadow \
 	-Wno-sign-compare \
+	-Wno-strict-prototypes \
 	-Wno-error-tautological-pointer-compare \
 	-Wno-unused-parameter
