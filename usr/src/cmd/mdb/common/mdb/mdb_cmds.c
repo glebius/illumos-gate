@@ -2253,7 +2253,7 @@ cmd_head(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *c;
 	mdb_pipe_t p;
 
-	if (!flags & DCMD_PIPE)
+	if (!(flags & DCMD_PIPE))
 		return (DCMD_USAGE);
 
 	if (argc == 1 || argc == 2) {
