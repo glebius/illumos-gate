@@ -97,7 +97,11 @@ fdio_ctl(mdb_io_t *io, int req, void *arg)
 	if (req == MDB_IOC_GETFD)
 		return (fdp->fd_fd);
 	else
+#ifdef __FreeBSD__
+		return (ioctl(fdp->fd_fd, (unsigned int)req, arg));
+#else
 		return (ioctl(fdp->fd_fd, req, arg));
+#endif
 }
 
 static void
