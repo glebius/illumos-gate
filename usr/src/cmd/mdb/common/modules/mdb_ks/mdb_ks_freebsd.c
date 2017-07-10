@@ -97,6 +97,7 @@ static int
 dmesg_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t msgbuf_addr;
+	ssize_t rval;
 	mdb_msgbuf_t buf;
 	uint_t verbose = 0;
 	int rseq, wseq;
@@ -129,9 +130,11 @@ dmesg_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	c = '\n';
 	while (rseq != wseq) {
-		mdb_vread(&c, sizeof(c), buf.msg_ptr + rseq);
-		mdb_printf("%c", c);
+		rval = mdb_vread(&c, sizeof(c), buf.msg_ptr + rseq);
 		rseq = MSGBUF_SEQNORM(&buf, rseq + 1);
+		if (rval != sizeof(c))
+			continue;
+		mdb_printf("%c", c);
 	}
 	if (c != '\n')
 		mdb_printf("\n");
