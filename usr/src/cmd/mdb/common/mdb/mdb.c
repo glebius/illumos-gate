@@ -717,8 +717,12 @@ mdb_run(void)
 		 * If we quit or abort using the output pager, reset the
 		 * line count on standard output back to zero.
 		 */
-		if (err == MDB_ERR_PAGER || MDB_ERR_IS_FATAL(err))
+		if (err == MDB_ERR_PAGER || MDB_ERR_IS_FATAL(err)) {
 			mdb_iob_clearlines(mdb.m_out);
+#ifdef __FreeBSD__
+			yydiscard();
+#endif
+		}
 
 		/*
 		 * If the user requested the debugger quit or abort back to
