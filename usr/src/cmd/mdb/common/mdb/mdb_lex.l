@@ -571,6 +571,9 @@ yydiscard(void)
 	}
 
 	BEGIN(S_INITIAL);
+#ifdef FLEX_SCANNER
+	yyrestart(yyin);
+#endif
 }
 
 static void
