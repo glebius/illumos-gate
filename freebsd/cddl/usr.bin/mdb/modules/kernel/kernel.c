@@ -565,6 +565,99 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+struct id_data {
+	pid_t id;
+	uintptr_t addr;
+};
+
+static int
+pid_cb(uintptr_t addr, const void *pdata, void *data)
+{
+	struct id_data *id;
+	mdb_proc_t p;
+
+	id = data;
+	if (mdb_ctf_vread(&p, "struct proc", "mdb_proc_t", addr, 0) == -1)
+		return (WALK_ERR);
+
+	if (p.p_pid == id->id) {
+		id->addr = addr;
+		return (WALK_DONE);
+	}
+
+	return (WALK_NEXT);	
+}
+
+int
+pid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct id_data id;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("PID required in address\n");
+		return (DCMD_ERR);
+	}
+
+	id.id = addr;
+	id.addr = 0;
+	if (mdb_walk("proc", pid_cb, &id) != 0) {
+		mdb_warn("can't walk 'proc'");
+		return (DCMD_ERR);
+	}
+
+	if (id.addr == 0) {
+		mdb_warn("PID not found\n");
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%#lr\n", id.addr);
+	return (DCMD_OK);
+}
+
+static int
+tid_cb(uintptr_t addr, const void *pdata, void *data)
+{
+	struct id_data *id;
+	mdb_thread_t td;
+
+	id = data;
+	if (mdb_ctf_vread(&td, "struct thread", "mdb_thread_t", addr, 0) == -1)
+		return (WALK_ERR);
+
+	if (td.td_tid == id->id) {
+		id->addr = addr;
+		return (WALK_DONE);
+	}
+
+	return (WALK_NEXT);	
+}
+
+int
+tid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct id_data id;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("TID required in address\n");
+		return (DCMD_ERR);
+	}
+
+	id.id = addr;
+	id.addr = 0;
+	if (mdb_walk("thread", tid_cb, &id) != 0) {
+		mdb_warn("can't walk 'thread'");
+		return (DCMD_ERR);
+	}
+
+	if (id.addr == 0) {
+		mdb_warn("TID not found\n");
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%#lr\n", id.addr);
+	return (DCMD_OK);
+}
+
 void
 thread_state_to_text(uint_t state, char *buf, size_t len)
 {
@@ -956,6 +1049,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "ps", NULL, "list processes (and associated threads)", ps },
 	{ "pgrep", "[-x] [-n | -o] pattern",
 		"pattern match against all processes", pgrep },
+	{ "pid", NULL, "find struct proc for PID", pid },
+	{ "tid", NULL, "find struct thread for TID", tid },
 
 	/* from kgrep.c + kernel.c */
 	{ "kgrep", KGREP_USAGE, "search kernel as for a pointer", kgrep,
