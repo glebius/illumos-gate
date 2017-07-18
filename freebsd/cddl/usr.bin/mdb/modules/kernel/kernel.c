@@ -566,7 +566,7 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 struct id_data {
-	pid_t id;
+	long id;
 	uintptr_t addr;
 };
 
@@ -592,13 +592,24 @@ int
 pid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct id_data id;
+	char *cp;
 
-	if (!(flags & DCMD_ADDRSPEC)) {
-		mdb_warn("PID required in address\n");
+	if (flags & DCMD_ADDRSPEC)
+		return (DCMD_USAGE);
+
+	if (argc != 1 || argv->a_type != MDB_TYPE_STRING)
+		return (DCMD_USAGE);
+
+	/*
+	 * This uses strtol() instead of mdb_strtoull() to force
+	 * parsing of the ID in decimal instead of the current radix.
+	 */
+	id.id = strtol(argv->a_un.a_str, &cp, 0);
+	if (*cp != '\0') {
+		mdb_warn("invalid PID\n");
 		return (DCMD_ERR);
 	}
 
-	id.id = addr;
 	id.addr = 0;
 	if (mdb_walk("proc", pid_cb, &id) != 0) {
 		mdb_warn("can't walk 'proc'");
@@ -636,13 +647,24 @@ int
 tid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct id_data id;
+	char *cp;
 
-	if (!(flags & DCMD_ADDRSPEC)) {
-		mdb_warn("TID required in address\n");
+	if (flags & DCMD_ADDRSPEC)
+		return (DCMD_USAGE);
+
+	if (argc != 1 || argv->a_type != MDB_TYPE_STRING)
+		return (DCMD_USAGE);
+
+	/*
+	 * This uses strtol() instead of mdb_strtoull() to force
+	 * parsing of the ID in decimal instead of the current radix.
+	 */
+	id.id = strtol(argv->a_un.a_str, &cp, 0);
+	if (*cp != '\0') {
+		mdb_warn("invalid PID\n");
 		return (DCMD_ERR);
 	}
 
-	id.id = addr;
 	id.addr = 0;
 	if (mdb_walk("thread", tid_cb, &id) != 0) {
 		mdb_warn("can't walk 'thread'");
