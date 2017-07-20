@@ -93,24 +93,28 @@
 #define	STACK_REGISTER	REG_FP
 #endif
 
+#ifndef MDB_PREFIX
+#define	MDB_PREFIX	"/usr"
+#endif
+
 #ifdef _LP64
 #define	MDB_DEF_IPATH	\
-	"%r/usr/platform/%p/lib/adb/%i:" \
-	"%r/usr/platform/%m/lib/adb/%i:" \
-	"%r/usr/lib/adb/%i"
+	"%r" MDB_PREFIX "/platform/%p/lib/adb/%i:" \
+	"%r" MDB_PREFIX "/platform/%m/lib/adb/%i:" \
+	"%r" MDB_PREFIX "/lib/adb/%i"
 #define	MDB_DEF_LPATH	\
-	"%r/usr/platform/%p/lib/mdb/%t/%i:" \
-	"%r/usr/platform/%m/lib/mdb/%t/%i:" \
-	"%r/usr/lib/mdb/%t/%i"
+	"%r" MDB_PREFIX "/platform/%p/lib/mdb/%t/%i:" \
+	"%r" MDB_PREFIX "/platform/%m/lib/mdb/%t/%i:" \
+	"%r" MDB_PREFIX "/lib/mdb/%t/%i:"
 #else
 #define	MDB_DEF_IPATH	\
-	"%r/usr/platform/%p/lib/adb:" \
-	"%r/usr/platform/%m/lib/adb:" \
-	"%r/usr/lib/adb"
+	"%r" MDB_PREFIX "/platform/%p/lib/adb:" \
+	"%r" MDB_PREFIX "/platform/%m/lib/adb:" \
+	"%r" MDB_PREFIX "/lib/adb"
 #define	MDB_DEF_LPATH	\
-	"%r/usr/platform/%p/lib/mdb/%t:" \
-	"%r/usr/platform/%m/lib/mdb/%t:" \
-	"%r/usr/lib/mdb/%t"
+	"%r" MDB_PREFIX "/platform/%p/lib/mdb/%t:" \
+	"%r" MDB_PREFIX "/platform/%m/lib/mdb/%t:" \
+	"%r" MDB_PREFIX "/lib/mdb/%t:"
 #endif
 
 #define	MDB_DEF_PROMPT "> "
