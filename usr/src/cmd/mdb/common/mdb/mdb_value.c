@@ -55,6 +55,13 @@
 #include <sys/isa_defs.h>
 #include <strings.h>
 
+#ifdef __FreeBSD__
+/* Only leave _BIG_ENDIAN defined on big endian platforms. */
+#if _BYTE_ORDER != _BIG_ENDIAN
+#undef _BIG_ENDIAN
+#endif
+#endif
+
 void mdb_value_tgt_destroy(mdb_tgt_t *);
 
 typedef struct mdb_value_data {

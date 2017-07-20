@@ -38,6 +38,13 @@
 #include <libctf.h>
 #include <string.h>
 
+#ifdef __FreeBSD__
+/* Only leave _BIG_ENDIAN defined on big endian platforms. */
+#if _BYTE_ORDER != _BIG_ENDIAN
+#undef _BIG_ENDIAN
+#endif
+#endif
+
 typedef struct tnarg {
 	mdb_tgt_t *tn_tgt;		/* target to use for lookup */
 	const char *tn_name;		/* query string to lookup */

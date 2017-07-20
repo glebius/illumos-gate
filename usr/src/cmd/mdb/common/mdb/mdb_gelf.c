@@ -35,6 +35,13 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
 
+#ifdef __FreeBSD__
+/* Only leave _BIG_ENDIAN defined on big endian platforms. */
+#if _BYTE_ORDER != _BIG_ENDIAN
+#undef _BIG_ENDIAN
+#endif
+#endif
+
 #define	GST_GROW	2	/* Mutable symbol table growth multiplier */
 #define	GST_DEFSZ	16	/* Mutable symbol table initial size */
 
@@ -713,18 +720,10 @@ gelf64_init(mdb_gelf_file_t *gf, mdb_io_t *io, Elf64_Ehdr *ehdr)
 int
 mdb_gelf_check(mdb_io_t *io, Elf32_Ehdr *ehp, GElf_Half etype)
 {
-#ifdef __FreeBSD__
-#if _BYTE_ORDER == _BIG_ENDIAN
-	uchar_t order = ELFDATA2MSB;
-#else
-	uchar_t order = ELFDATA2LSB;
-#endif
-#else
 #ifdef _BIG_ENDIAN
 	uchar_t order = ELFDATA2MSB;
 #else
 	uchar_t order = ELFDATA2LSB;
-#endif
 #endif
 	ssize_t nbytes;
 

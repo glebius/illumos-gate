@@ -64,6 +64,13 @@ typedef struct mdb_opt {
 
 #ifdef _MDB
 
+#ifdef __FreeBSD__
+/* Only leave _BIG_ENDIAN defined on big endian platforms. */
+#if _BYTE_ORDER != _BIG_ENDIAN
+#undef _BIG_ENDIAN
+#endif
+#endif
+
 #ifdef	_BIG_ENDIAN
 #ifdef	_LP64
 #define	MDB_INIT_CHAR(x)	((const char *)((uintptr_t)(uchar_t)(x) << 56))

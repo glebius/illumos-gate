@@ -51,6 +51,13 @@
 #include <libctf.h>
 #include <ctype.h>
 
+#ifdef __FreeBSD__
+/* Only leave _BIG_ENDIAN defined on big endian platforms. */
+#if _BYTE_ORDER != _BIG_ENDIAN
+#undef _BIG_ENDIAN
+#endif
+#endif
+
 typedef struct holeinfo {
 	ulong_t hi_offset;		/* expected offset */
 	uchar_t hi_isunion;		/* represents a union */
