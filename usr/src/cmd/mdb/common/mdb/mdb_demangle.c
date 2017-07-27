@@ -104,7 +104,7 @@ mdb_dem_filter(mdb_demangler_t *dmp, const char *name)
 	size_t resid;
 
 	/*
-/	 * If static, const, and volatile qualifiers should not be displayed,
+	 * If static, const, and volatile qualifiers should not be displayed,
 	 * rip all of them out of dmp->dm_dem.
 	 */
 	if (!(dmp->dm_flags & MDB_DM_QUAL)) {

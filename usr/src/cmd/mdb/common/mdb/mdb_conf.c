@@ -54,7 +54,6 @@ mdb_conf_platform(void)
 #else
 	static char platbuf[MAXNAMELEN];
 
-				return 
 	if (sysinfo(SI_PLATFORM, platbuf, MAXNAMELEN) != -1)
 		return (platbuf);
 #endif
