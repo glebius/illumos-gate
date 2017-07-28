@@ -1011,8 +1011,9 @@ kgrep_walk_uma_keg(uintptr_t addr, const void *data, void *private)
 /*
  * Ideally this would scan all valid kernel memory.
  *
- * For now this scans the kernel_map.  This doesn't catch things that
- * are direct mapped (like small UMA allocations on amd64).
+ * Currently this scans the kernel_map along with all UMA allocations
+ * on architectures like amd64 that use a custom virtual address
+ * allocator for small UMA allocations.
  */
 int
 kgrep_subr(kgrep_cb_func *cb, void *cbdata)
