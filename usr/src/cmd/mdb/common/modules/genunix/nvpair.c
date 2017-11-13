@@ -25,7 +25,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef __FreeBSD__
 #include <sys/sysinfo.h>
+#endif
 #include <sys/nvpair.h>
 #include <sys/nvpair_impl.h>
 
@@ -47,7 +49,7 @@ nvpair_walk_init(mdb_walk_state_t *wsp)
 	nvpriv_t nvpriv;
 	i_nvp_t *tmp;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("nvpair does not support global walks\n");
 		return (WALK_ERR);
 	}
@@ -74,7 +76,7 @@ nvpair_walk_step(mdb_walk_state_t *wsp)
 	nvpair_t *nvpair;
 	i_nvp_t i_nvp, *tmp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&i_nvp, sizeof (i_nvp), wsp->walk_addr) == -1) {
@@ -133,10 +135,10 @@ print_nvlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct {
 	data_type_t	type;
 	int		elem_size;
-	char		*type_name;
+	const char	*type_name;
 } nvpair_info_t;
 
-nvpair_info_t nvpair_info[] =  {
+static nvpair_info_t nvpair_info[] =  {
 	{ DATA_TYPE_BOOLEAN,		1, "boolean" },
 	{ DATA_TYPE_BOOLEAN_VALUE,	4, "boolean_value" },
 	{ DATA_TYPE_BYTE,		1, "byte" },
@@ -216,9 +218,10 @@ int
 nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	nvpair_t	nvpair_tmp, *nvpair;
-	int32_t		i, size, nelem, elem_size = 0;
+	int32_t		size, elem_size = 0;
+	unsigned int	i, nelem;
 	char		*data = NULL, *data_end = NULL;
-	char		*type_name = NULL;
+	const char	*type_name = NULL;
 	data_type_t	type = DATA_TYPE_UNKNOWN;
 	int		quiet = FALSE;
 	int		recurse = FALSE;
@@ -368,7 +371,7 @@ nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * otherwise print them out as byte arrays
 	 */
 	if (elem_size == 0) {
-		int32_t	count = 0;
+		unsigned int	count = 0;
 
 		i = 0;
 		while ((&data[i] < data_end) && (count < nelem)) {

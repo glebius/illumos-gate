@@ -44,7 +44,11 @@ extern "C" {
 #define	NVPAIR_WALKER_DESCR "walk through the nvpairs in an unpacked nvlist"
 
 #ifdef _KERNEL
+#ifdef __FreeBSD__
+#define	NVPAIR_MODULE	"opensolaris.ko"
+#else
 #define	NVPAIR_MODULE	"genunix"
+#endif
 #else /* _KERNEL */
 #define	NVPAIR_MODULE	"libnvpair"
 #endif /* _KERNEL */
