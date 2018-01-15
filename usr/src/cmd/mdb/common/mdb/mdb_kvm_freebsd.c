@@ -172,7 +172,7 @@ kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 			case SHT_X86_64_UNWIND:
 #endif
 #endif
-				if ((shdr[i].sh_flags & SHF_ALLOC) == 0)
+				if ((shp->sh_flags & SHF_ALLOC) == 0)
 					break;
 				alignmask = shp->sh_addralign - 1;
 				mapbase += alignmask;
