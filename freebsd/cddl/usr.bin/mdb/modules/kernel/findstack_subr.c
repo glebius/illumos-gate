@@ -121,6 +121,7 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 		    funcname, sizeof(funcname), NULL) == 0 &&
 		    (strcmp(funcname, "calltrap") == 0 ||
 		    strcmp(funcname, "fork_trampoline") == 0 ||
+		    strcmp(funcname, "mchk_calltrap") == 0 ||
 		    strcmp(funcname, "nmi_calltrap") == 0 ||
 		    strcmp(funcname, "Xdblfault") == 0 ||
 		    strncmp(funcname, "Xatpic_intr", 11) == 0 ||
