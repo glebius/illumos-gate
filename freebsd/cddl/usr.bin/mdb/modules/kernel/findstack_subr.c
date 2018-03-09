@@ -120,6 +120,7 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 		if (pc != 0 && mdb_lookup_by_addr(pc, MDB_TGT_SYM_FUZZY,
 		    funcname, sizeof(funcname), NULL) == 0 &&
 		    (strcmp(funcname, "calltrap") == 0 ||
+		    strcmp(funcname, "fast_syscall_common") == 0 ||
 		    strcmp(funcname, "fork_trampoline") == 0 ||
 		    strcmp(funcname, "mchk_calltrap") == 0 ||
 		    strcmp(funcname, "nmi_calltrap") == 0 ||

@@ -391,6 +391,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		if ((mdb_tgt_lookup_by_addr(t, pc, MDB_TGT_SYM_FUZZY,
 		    funcname, sizeof(funcname), &s, NULL) == 0) &&
 		    (strcmp(funcname, "calltrap") == 0 ||
+		    strcmp(funcname, "fast_syscall_common") == 0 ||
 		    strcmp(funcname, "fork_trampoline") == 0 ||
 		    strcmp(funcname, "mchk_calltrap") == 0 ||
 		    strcmp(funcname, "nmi_calltrap") == 0 ||
