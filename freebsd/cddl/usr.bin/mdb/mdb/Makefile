@@ -203,3 +203,8 @@ CWARNFLAGS.clang+= \
 	-Wno-strict-prototypes \
 	-Wno-error-tautological-pointer-compare \
 	-Wno-unused-parameter
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000 || \
+    ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100
+CWARNFLAGS.mdb_lex.c=-Wno-misleading-indentation
+.endif
