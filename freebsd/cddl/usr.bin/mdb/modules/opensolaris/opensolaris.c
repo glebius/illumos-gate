@@ -22,8 +22,14 @@
 
 #include <mdb/mdb_modapi.h>
 
+#ifndef __FreeBSD_version
+#error foo
+#endif
+
 #include "nvpair.h"
+#if __FreeBSD_version < 1400025
 #include "avl.h"
+#endif
 
 static const mdb_dcmd_t dcmds[] = {
 	{ NVPAIR_DCMD_NAME, NVPAIR_DCMD_USAGE, NVPAIR_DCMD_DESCR,
@@ -36,8 +42,10 @@ static const mdb_dcmd_t dcmds[] = {
 static const mdb_walker_t walkers[] = {
 	{ NVPAIR_WALKER_NAME, NVPAIR_WALKER_DESCR,
 		nvpair_walk_init, nvpair_walk_step, NULL },
+#if __FreeBSD_version < 1400025
 	{ AVL_WALK_NAME, AVL_WALK_DESC,
 		avl_walk_init, avl_walk_step, avl_walk_fini },
+#endif
 	{ NULL }
 };
 
