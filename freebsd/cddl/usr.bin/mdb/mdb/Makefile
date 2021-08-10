@@ -201,7 +201,7 @@ CWARNFLAGS.clang+= \
 	-Wno-shadow \
 	-Wno-sign-compare \
 	-Wno-strict-prototypes \
-	-Wno-error-tautological-pointer-compare \
+	-Wno-error=tautological-pointer-compare \
 	-Wno-unused-parameter
 
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000 || \
